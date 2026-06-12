@@ -1,14 +1,29 @@
 {
-  "name": "@company/stripe",
+  "name": "@liveedevteam/stripe",
   "version": "0.1.0",
-  "private": true,
+  "description": "Stripe integration module for Next.js + Supabase — one-time payments, subscriptions, webhooks",
   "type": "module",
   "exports": {
-    "./actions": "./src/actions/stripe.ts",
-    "./webhooks": "./src/webhooks/handler.ts"
+    "./actions": {
+      "types": "./dist/actions/stripe.d.ts",
+      "import": "./dist/actions/stripe.js",
+      "require": "./dist/actions/stripe.cjs"
+    },
+    "./webhooks": {
+      "types": "./dist/webhooks/handler.d.ts",
+      "import": "./dist/webhooks/handler.js",
+      "require": "./dist/webhooks/handler.cjs"
+    }
   },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
-    "typecheck": "tsc --noEmit"
+    "build": "tsup",
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "npm run build"
   },
   "peerDependencies": {
     "@supabase/ssr": ">=0.5",
@@ -17,8 +32,35 @@
     "stripe": ">=16"
   },
   "devDependencies": {
+    "@supabase/ssr": "^0.12.0",
+    "@supabase/supabase-js": "^2.108.1",
     "@types/node": "^20",
+    "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.2.3",
+    "next": "^16.2.9",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7",
+    "stripe": "^22.2.0",
     "ts-node": "^10",
+    "tsup": "^8.5.1",
     "typescript": "^5"
-  }
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "keywords": [
+    "stripe",
+    "next.js",
+    "supabase",
+    "payments",
+    "subscriptions",
+    "server-actions"
+  ],
+  "author": "liveedevteam",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/liveedevteam/nextjs-supabase-stripe.git"
+  },
+  "homepage": "https://github.com/liveedevteam/nextjs-supabase-stripe#readme"
 }
