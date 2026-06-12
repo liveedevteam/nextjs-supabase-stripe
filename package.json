@@ -1,0 +1,23 @@
+{
+  "name": "@company/stripe",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./actions": "./src/actions/stripe.ts",
+    "./webhooks": "./src/webhooks/handler.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "peerDependencies": {
+    "@supabase/supabase-js": ">=2",
+    "next": ">=14",
+    "stripe": ">=16"
+  },
+  "devDependencies": {
+    "@types/node": "^20",
+    "ts-node": "^10",
+    "typescript": "^5"
+  }
+}
