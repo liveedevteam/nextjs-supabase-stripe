@@ -2,6 +2,61 @@
 
 Stripe integration module for **Next.js App Router + Supabase** — one-time payments, subscriptions, webhooks, and server actions.
 
+## Claude Code setup skill
+
+This package ships a **Claude Code skill** that automates the full integration — migration, webhook route, env vars, and more. No copy-pasting required.
+
+### How to use it
+
+After installing the package, open [Claude Code](https://claude.ai/code) in your project and type:
+
+```
+set up stripe
+```
+
+Claude detects what's already in place and walks through every step automatically.
+
+**What the skill does:**
+
+1. Checks for missing dependencies and installs them
+2. Creates the Supabase migration (`stripe_customers`, `subscriptions`, `orders`, `products`, `prices`, `webhook_events`) and applies it
+3. Creates `app/api/webhooks/stripe/route.ts` with signature verification and idempotency
+4. Scaffolds a `CheckoutButton` component (and billing portal button if subscriptions are enabled)
+5. Adds all required env vars to `.env.local` (with placeholder values to fill in)
+6. Optionally configures Slack failure notifications
+7. Warns you to run the backfill script if existing users are present
+
+The skill file (`SKILL.md`) ships inside the package — Claude Code reads it automatically from `node_modules/@liveedevteam/stripe/SKILL.md`. You get updated instructions with every version you install.
+
+### Example session
+
+```
+You: set up stripe
+
+Claude: Running preflight checks...
+  ✓ @liveedevteam/stripe installed
+  ✓ stripe installed
+  ✓ @supabase/ssr installed
+  ✗ Supabase migration not found
+
+  Creating migration...
+  Writing supabase/migrations/20260101000000_create_stripe_tables.sql
+  Running: supabase db push
+
+  Creating webhook route...
+  Writing app/api/webhooks/stripe/route.ts
+
+  Adding env vars to .env.local...
+  STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET, NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
+
+  Done. Next steps:
+  1. Fill in the placeholder values in .env.local
+  2. Run: stripe listen --forward-to localhost:3000/api/webhooks/stripe
+  3. Test: stripe trigger checkout.session.completed
+```
+
+---
+
 ## Requirements
 
 - Next.js 14+
