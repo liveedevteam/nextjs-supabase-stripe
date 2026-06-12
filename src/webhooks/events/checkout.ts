@@ -5,8 +5,7 @@ export const onCheckoutCompleted = async (
   session: Stripe.Checkout.Session,
   supabase: SupabaseClient
 ) => {
-  const userId = session.metadata?.user_id
-  if (!userId) throw new Error(`No user_id in session metadata: ${session.id}`)
+  const userId = session.metadata?.user_id ?? null
 
   if (session.mode === 'payment') {
     await supabase.from('orders').insert({
@@ -19,7 +18,7 @@ export const onCheckoutCompleted = async (
     return
   }
 
-  if (session.mode === 'subscription' && session.customer) {
+  if (session.mode === 'subscription' && session.customer && userId) {
     await supabase.from('stripe_customers').upsert(
       {
         user_id: userId,
