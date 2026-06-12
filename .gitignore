@@ -3,3 +3,10 @@ dist/
 .env
 .env.local
 *.tsbuildinfo
+*.tgz
+
+# Claude Code local settings (machine-specific)
+.claude/
+
+# Supabase CLI temp files
+supabase/.temp/
