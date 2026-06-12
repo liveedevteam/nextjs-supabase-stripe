@@ -19,7 +19,8 @@
     "dist",
     "README.md",
     "LICENSE",
-    "CLAUDE.md"
+    "CLAUDE.md",
+    "SKILL.md"
   ],
   "scripts": {
     "build": "tsup",

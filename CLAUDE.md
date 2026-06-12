@@ -130,3 +130,18 @@ SLACK_WEBHOOK_URL   # optional
 - **Calling `req.json()` in a webhook handler** — breaks Stripe signature verification. This package uses `req.text()` correctly.
 - **Showing subscription/portal buttons to anonymous users without a guard** — they throw on submit. Check session before rendering.
 - **Forgetting `STRIPE_WEBHOOK_SECRET`** — the webhook handler returns `400 Invalid signature` for every event without it.
+
+---
+
+## Automated setup skill
+
+This package ships a Claude Code skill that fully sets up the integration in your project —
+migration, webhook route, env vars, and backfill warning — in one step.
+
+To use it, say:
+
+```
+set up stripe
+```
+
+The skill file is at `node_modules/@liveedevteam/stripe/SKILL.md`.
