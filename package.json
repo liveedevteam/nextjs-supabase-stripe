@@ -62,7 +62,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/liveedevteam/nextjs-supabase-stripe.git"
+    "url": "git+https://github.com/liveedevteam/nextjs-supabase-stripe.git"
   },
   "homepage": "https://github.com/liveedevteam/nextjs-supabase-stripe#readme"
 }
