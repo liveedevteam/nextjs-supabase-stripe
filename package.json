@@ -1,6 +1,6 @@
 {
   "name": "@liveedevteam/stripe",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Stripe integration module for Next.js + Supabase — one-time payments, subscriptions, webhooks",
   "type": "module",
   "exports": {
