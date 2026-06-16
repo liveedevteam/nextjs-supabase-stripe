@@ -37,10 +37,23 @@ export async function createCheckout(priceId: string, mode: 'payment' | 'subscri
 
   if (mode === 'subscription' && !user) throw new Error('Unauthorized')
 
+  // Reuse existing Stripe customer to avoid duplicates on re-subscription
+  let existingCustomerId: string | undefined
+  if (user) {
+    const { data: customer } = await serviceClient
+      .from('stripe_customers')
+      .select('stripe_customer_id')
+      .eq('user_id', user.id)
+      .single()
+    existingCustomerId = customer?.stripe_customer_id
+  }
+
   const stripe = getStripeClient()
   const session = await stripe.checkout.sessions.create({
     mode,
-    ...(user && { customer_email: user.email }),
+    ...(existingCustomerId
+      ? { customer: existingCustomerId }
+      : user && { customer_email: user.email }),
     line_items: [{ price: priceId, quantity: 1 }],
     success_url: `${process.env.NEXT_PUBLIC_APP_URL}/success`,
     cancel_url: `${process.env.NEXT_PUBLIC_APP_URL}/cancel`,
@@ -79,14 +92,16 @@ export async function getSubscription() {
     .from('subscriptions')
     .select('*')
     .eq('user_id', user.id)
-    .single()
+    .order('current_period_end', { ascending: false })
+    .limit(1)
+    .maybeSingle()
 
   return data
 }
 
 export async function requireActiveSubscription() {
   const subscription = await getSubscription()
-  if (!subscription || subscription.status !== 'active') {
+  if (!subscription || !['active', 'trialing'].includes(subscription.status)) {
     redirect('/pricing')
   }
 }

@@ -27,26 +27,24 @@ export const createWebhookHandler = (options: WebhookHandlerOptions = {}) =>
       return new Response('Invalid signature', { status: 400 })
     }
 
-    const { data: existing } = await supabase
+    // Claim the event before processing so concurrent retries are blocked by the unique constraint
+    const { error: claimError } = await supabase
       .from('webhook_events')
-      .select('id')
-      .eq('id', event.id)
-      .single()
+      .insert({ id: event.id, type: event.type })
 
-    if (existing) return new Response('Already processed', { status: 200 })
+    if (claimError?.code === '23505') return new Response('Already processed', { status: 200 })
+    if (claimError) return new Response('Database error', { status: 500 })
 
     try {
       await handleEvent(event, supabase)
     } catch (error) {
+      // Release the claim so Stripe can retry
+      await supabase.from('webhook_events').delete().eq('id', event.id)
       if (options.slack?.webhookUrl) {
         await notifySlack(options.slack, event, error)
       }
       return new Response('Internal error', { status: 500 })
     }
-
-    await supabase
-      .from('webhook_events')
-      .insert({ id: event.id, type: event.type })
 
     return new Response('OK', { status: 200 })
   }

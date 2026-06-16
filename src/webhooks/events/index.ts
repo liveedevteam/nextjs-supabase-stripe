@@ -2,7 +2,6 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import type Stripe from 'stripe'
 import { onCheckoutCompleted } from './checkout.js'
 import { onInvoicePaid, onPaymentFailed, onTrialWillEnd } from './invoice.js'
-import { onPaymentIntentSucceeded } from './payment.js'
 import { onSubscriptionDeleted, onSubscriptionUpdated } from './subscription.js'
 
 export const handleEvent = async (event: Stripe.Event, supabase: SupabaseClient) => {
@@ -20,7 +19,5 @@ export const handleEvent = async (event: Stripe.Event, supabase: SupabaseClient)
       return onPaymentFailed(event.data.object as Stripe.Invoice, supabase)
     case 'customer.subscription.trial_will_end':
       return onTrialWillEnd(event.data.object as Stripe.Subscription, supabase)
-    case 'payment_intent.succeeded':
-      return onPaymentIntentSucceeded(event.data.object as Stripe.PaymentIntent, supabase)
   }
 }

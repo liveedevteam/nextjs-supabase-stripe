@@ -19,11 +19,13 @@ export const backfillStripeCustomers = async () => {
 
     if (existing) continue
 
-    const customer = await stripe.customers.create({ email: user.email! })
+    // Only sync users who already have a Stripe customer — do not create new ones
+    const results = await stripe.customers.list({ email: user.email!, limit: 1 })
+    if (results.data.length === 0) continue
 
     await supabase.from('stripe_customers').insert({
       user_id: user.id,
-      stripe_customer_id: customer.id,
+      stripe_customer_id: results.data[0].id,
     })
 
     await new Promise(r => setTimeout(r, 200))

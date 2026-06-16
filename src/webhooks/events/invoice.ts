@@ -30,8 +30,9 @@ export const onPaymentFailed = async (
 }
 
 export const onTrialWillEnd = async (
-  _subscription: Stripe.Subscription,
+  subscription: Stripe.Subscription,
   _supabase: SupabaseClient
 ) => {
-  // Extend here to email the user or trigger a notification
+  // Trial ending in ~3 days. Add email/notification logic here.
+  console.warn(`[stripe] trial_will_end received for subscription ${subscription.id} — no notification logic configured`)
 }
