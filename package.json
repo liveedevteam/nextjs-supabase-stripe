@@ -18,6 +18,11 @@
       "types": "./dist/types.d.ts",
       "import": "./dist/types.js",
       "require": "./dist/types.cjs"
+    },
+    "./testing": {
+      "types": "./dist/testing.d.ts",
+      "import": "./dist/testing.js",
+      "require": "./dist/testing.cjs"
     }
   },
   "files": [
