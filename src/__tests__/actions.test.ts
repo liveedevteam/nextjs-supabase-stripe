@@ -8,7 +8,7 @@ vi.mock('next/navigation', () => ({ redirect: vi.fn() }))
 vi.mock('@supabase/ssr', () => ({ createServerClient: vi.fn() }))
 vi.mock('../client.js', () => ({ getServiceClient: vi.fn(), getStripeClient: vi.fn() }))
 
-import { changeSubscription, createCheckout, getBillingPortal, getSubscription, requireActiveSubscription } from '../actions/stripe.js'
+import { cancelSubscription, changeSubscription, createCheckout, getBillingPortal, getSubscription, requireActiveSubscription } from '../actions/stripe.js'
 import { redirect } from 'next/navigation'
 import { createServerClient } from '@supabase/ssr'
 import { getServiceClient, getStripeClient } from '../client.js'
@@ -21,11 +21,16 @@ const mockAuthClient = (user: typeof USER | null) => ({
 
 const mockSubscriptionRetrieve = vi.fn()
 const mockSubscriptionUpdate = vi.fn()
+const mockSubscriptionCancel = vi.fn()
 
 const mockStripe = {
   checkout: { sessions: { create: vi.fn().mockResolvedValue({ url: 'https://checkout.stripe.com/test' }) } },
   billingPortal: { sessions: { create: vi.fn().mockResolvedValue({ url: 'https://billing.stripe.com/test' }) } },
-  subscriptions: { retrieve: mockSubscriptionRetrieve, update: mockSubscriptionUpdate },
+  subscriptions: {
+    retrieve: mockSubscriptionRetrieve,
+    update: mockSubscriptionUpdate,
+    cancel: mockSubscriptionCancel,
+  },
 }
 
 beforeEach(() => {
@@ -261,5 +266,55 @@ describe('changeSubscription', () => {
     await expect(changeSubscription(NEW_PRICE_ID)).rejects.toThrow()
     // maybeSingle is only reachable after the full .in().order().limit() chain
     expect(spies('subscriptions').maybeSingleFn).toHaveBeenCalled()
+  })
+})
+
+describe('cancelSubscription', () => {
+  const STRIPE_SUB_ID = 'sub_existing'
+
+  beforeEach(() => {
+    mockSubscriptionUpdate.mockResolvedValue({})
+    mockSubscriptionCancel.mockResolvedValue({})
+  })
+
+  it('throws Unauthorized when not logged in', async () => {
+    vi.mocked(createServerClient).mockReturnValue(mockAuthClient(null) as any)
+    await expect(cancelSubscription()).rejects.toThrow('Unauthorized')
+  })
+
+  it('throws when user has no active subscription', async () => {
+    vi.mocked(createServerClient).mockReturnValue(mockAuthClient(USER) as any)
+    const { supabase } = mockSupabase({ subscriptions: { maybeSingle: { data: null } } })
+    vi.mocked(getServiceClient).mockReturnValue(supabase)
+
+    await expect(cancelSubscription()).rejects.toThrow('No active subscription found')
+  })
+
+  it('sets cancel_at_period_end: true by default (soft cancel)', async () => {
+    vi.mocked(createServerClient).mockReturnValue(mockAuthClient(USER) as any)
+    const { supabase } = mockSupabase({
+      subscriptions: { maybeSingle: { data: { stripe_subscription_id: STRIPE_SUB_ID } } },
+    })
+    vi.mocked(getServiceClient).mockReturnValue(supabase)
+
+    await cancelSubscription()
+
+    expect(mockSubscriptionUpdate).toHaveBeenCalledWith(STRIPE_SUB_ID, {
+      cancel_at_period_end: true,
+    })
+    expect(mockSubscriptionCancel).not.toHaveBeenCalled()
+  })
+
+  it('calls subscriptions.cancel when immediately=true', async () => {
+    vi.mocked(createServerClient).mockReturnValue(mockAuthClient(USER) as any)
+    const { supabase } = mockSupabase({
+      subscriptions: { maybeSingle: { data: { stripe_subscription_id: STRIPE_SUB_ID } } },
+    })
+    vi.mocked(getServiceClient).mockReturnValue(supabase)
+
+    await cancelSubscription(true)
+
+    expect(mockSubscriptionCancel).toHaveBeenCalledWith(STRIPE_SUB_ID)
+    expect(mockSubscriptionUpdate).not.toHaveBeenCalled()
   })
 })
