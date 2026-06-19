@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.5] - 2026-06-19
+
+### Added
+- New `@liveedevteam/stripe/testing` export with two utilities:
+  - `buildWebhookRequest(eventType, object, options)` — builds a properly HMAC-signed `Request` that passes Stripe's `constructEvent` verification; pass it directly to your `POST` route handler in tests
+  - `stripeFixtures` — pre-built event objects in the 2026-05-27.dahlia API shape (period dates on `items.data[0]`, invoice subscription at `parent.subscription_details.subscription`)
+
 ## [0.1.4] - 2026-06-19
 
 ### Fixed
