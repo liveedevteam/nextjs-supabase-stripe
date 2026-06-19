@@ -52,7 +52,7 @@
 - [ ] **Webhook timeout guard** — wrap `handleEvent` in `Promise.race` against a 25s timeout so Stripe gets a retryable 500 instead of a hanging connection
 
 ### Testing
-- [ ] **Integration smoke tests** — a single test file that hits real Stripe sandbox + `supabase start` to catch API version drift without mocks; runs in CI only when `STRIPE_SECRET_KEY` is present
+- [x] **Integration smoke tests** — 15 tests across 4 files hitting real local Supabase; covers webhook handler routing, checkout/subscription/invoice event handlers, and idempotency via real DB UNIQUE constraint; CI job runs on main pushes via `supabase start`
 
 ---
 
