@@ -19,28 +19,32 @@ export const onSubscriptionUpdated = async (
   supabase: SupabaseClient
 ) => {
   const userId = await resolveUserId(subscription.customer as string, supabase)
-  const price = subscription.items.data[0]?.price
+  const item = subscription.items.data[0]
+  if (!item) throw new Error(`Subscription ${subscription.id} has no items`)
+  const price = item.price
 
-  await supabase.from('subscriptions').upsert(
+  const { error } = await supabase.from('subscriptions').upsert(
     {
       user_id: userId,
       stripe_subscription_id: subscription.id,
       stripe_price_id: price?.id ?? '',
       status: subscription.status,
-      current_period_start: new Date(subscription.current_period_start * 1000).toISOString(),
-      current_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
+      current_period_start: new Date(item.current_period_start * 1000).toISOString(),
+      current_period_end: new Date(item.current_period_end * 1000).toISOString(),
       cancel_at_period_end: subscription.cancel_at_period_end,
     },
     { onConflict: 'stripe_subscription_id' }
   )
+  if (error) throw error
 }
 
 export const onSubscriptionDeleted = async (
   subscription: Stripe.Subscription,
   supabase: SupabaseClient
 ) => {
-  await supabase
+  const { error } = await supabase
     .from('subscriptions')
     .update({ status: 'canceled' })
     .eq('stripe_subscription_id', subscription.id)
+  if (error) throw error
 }

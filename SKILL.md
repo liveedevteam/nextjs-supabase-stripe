@@ -1,7 +1,7 @@
-# Skill: Setup Stripe — @company/stripe
+# Skill: Setup Stripe — @liveedevteam/stripe
 
 ## Description
-Fully sets up the `@company/stripe` module in the current Next.js + Supabase project.
+Fully sets up the `@liveedevteam/stripe` module in the current Next.js + Supabase project.
 Handles both new projects and existing projects that need Stripe added.
 
 Trigger phrases:
@@ -25,9 +25,9 @@ Before doing anything, Claude must verify the following. Stop and report clearly
    - Check for `NEXT_PUBLIC_SUPABASE_URL` in `.env.local` or `.env`
    - If not found → stop and tell the engineer to set up Supabase first
 
-3. **Is `@company/stripe` already installed?**
-   - Check `package.json` for `@company/stripe`
-   - If not found → run `pnpm add @company/stripe stripe @supabase/ssr` before continuing
+3. **Is `@liveedevteam/stripe` already installed?**
+   - Check `package.json` for `@liveedevteam/stripe`
+   - If not found → run `pnpm add @liveedevteam/stripe stripe @supabase/ssr` before continuing
 
 4. **Is Stripe already set up in this project?**
    - Check if `app/api/webhooks/stripe/route.ts` already exists
@@ -42,10 +42,10 @@ Before doing anything, Claude must verify the following. Stop and report clearly
 
 ## Step 1 — Install Dependencies
 
-If `stripe`, `@company/stripe`, or `@supabase/ssr` are missing from `package.json`, install them:
+If `stripe`, `@liveedevteam/stripe`, or `@supabase/ssr` are missing from `package.json`, install them:
 
 ```bash
-pnpm add @company/stripe stripe @supabase/ssr
+pnpm add @liveedevteam/stripe stripe @supabase/ssr
 ```
 
 Verify installation succeeded before moving to the next step.
@@ -138,7 +138,7 @@ If `supabase db push` fails, report the error clearly and stop. Do not continue 
 Create `app/api/webhooks/stripe/route.ts` if it does not already exist:
 
 ```ts
-import { createWebhookHandler } from '@company/stripe/webhooks'
+import { createWebhookHandler } from '@liveedevteam/stripe/webhooks'
 
 export const POST = createWebhookHandler()
 ```
@@ -153,7 +153,7 @@ If not, create `components/CheckoutButton.tsx`:
 ```tsx
 'use client'
 
-import { createCheckout } from '@company/stripe/actions'
+import { createCheckout } from '@liveedevteam/stripe/actions'
 
 interface CheckoutButtonProps {
   priceId: string
@@ -181,7 +181,7 @@ Create `components/BillingPortalButton.tsx` if it does not exist:
 ```tsx
 'use client'
 
-import { getBillingPortal } from '@company/stripe/actions'
+import { getBillingPortal } from '@liveedevteam/stripe/actions'
 
 export const BillingPortalButton = () => (
   <form action={getBillingPortal}>
@@ -239,7 +239,7 @@ Would you like to enable Slack notifications when a webhook event fails? (yes/no
 
 4. Update `app/api/webhooks/stripe/route.ts` to pass the Slack config:
    ```ts
-   import { createWebhookHandler } from '@company/stripe/webhooks'
+   import { createWebhookHandler } from '@liveedevteam/stripe/webhooks'
 
    export const POST = createWebhookHandler({
      slack: {
@@ -273,7 +273,7 @@ If this is an **existing project** (had `supabase/migrations/` before this skill
 This project has existing auth users who do not have a Stripe customer ID.
 Before going live, run the backfill script:
 
-  npx ts-node node_modules/@company/stripe/scripts/backfill.ts
+  npx ts-node node_modules/@liveedevteam/stripe/scripts/backfill.ts
 
 Always run this against staging first. Never run directly on production without testing.
 ```

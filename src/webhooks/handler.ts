@@ -1,5 +1,4 @@
-import { createClient } from '@supabase/supabase-js'
-import { getStripeClient } from '../client.js'
+import { getServiceClient, getStripeClient } from '../client.js'
 import { handleEvent } from './events/index.js'
 import { notifySlack } from './notifier.js'
 
@@ -12,10 +11,7 @@ interface WebhookHandlerOptions {
 
 export const createWebhookHandler = (options: WebhookHandlerOptions = {}) =>
   async (req: Request): Promise<Response> => {
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    )
+    const supabase = getServiceClient()
     const stripe = getStripeClient()
     const sig = req.headers.get('stripe-signature')!
     const body = await req.text()

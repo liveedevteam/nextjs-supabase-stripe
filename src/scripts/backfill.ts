@@ -1,11 +1,24 @@
-import { createClient } from '@supabase/supabase-js'
-import { getStripeClient } from '../client.js'
+import Stripe from 'stripe'
+import { getServiceClient, getStripeClient } from '../client.js'
+
+// Matches by email only — users who changed their email after paying will not be found.
+// Review any skipped users manually in the Stripe dashboard if needed.
+const listCustomerByEmail = async (stripe: Stripe, email: string) => {
+  for (let attempt = 0; attempt < 4; attempt++) {
+    try {
+      return await stripe.customers.list({ email, limit: 1 })
+    } catch (err) {
+      if (err instanceof Stripe.errors.StripeRateLimitError && attempt < 3) {
+        await new Promise(r => setTimeout(r, (attempt + 1) * 1000))
+        continue
+      }
+      throw err
+    }
+  }
+}
 
 export const backfillStripeCustomers = async () => {
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  )
+  const supabase = getServiceClient()
   const stripe = getStripeClient()
 
   const { data: users } = await supabase.auth.admin.listUsers()
@@ -20,8 +33,8 @@ export const backfillStripeCustomers = async () => {
     if (existing) continue
 
     // Only sync users who already have a Stripe customer — do not create new ones
-    const results = await stripe.customers.list({ email: user.email!, limit: 1 })
-    if (results.data.length === 0) continue
+    const results = await listCustomerByEmail(stripe, user.email!)
+    if (!results || results.data.length === 0) continue
 
     await supabase.from('stripe_customers').insert({
       user_id: user.id,

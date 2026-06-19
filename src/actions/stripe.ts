@@ -1,10 +1,21 @@
 'use server'
 
 import { createServerClient } from '@supabase/ssr'
-import { createClient } from '@supabase/supabase-js'
 import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
-import { getStripeClient } from '../client.js'
+import { getServiceClient, getStripeClient } from '../client.js'
+
+export type Subscription = {
+  id: string
+  user_id: string
+  stripe_subscription_id: string
+  stripe_price_id: string
+  status: 'active' | 'canceled' | 'incomplete' | 'incomplete_expired' | 'past_due' | 'trialing' | 'unpaid' | 'paused'
+  current_period_start: string
+  current_period_end: string
+  cancel_at_period_end: boolean
+  created_at: string
+}
 
 const getAuthClient = async () => {
   const cookieStore = await cookies()
@@ -26,11 +37,6 @@ const getAuthClient = async () => {
   )
 }
 
-const serviceClient = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
-
 export async function createCheckout(priceId: string, mode: 'payment' | 'subscription') {
   const supabase = await getAuthClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -40,7 +46,7 @@ export async function createCheckout(priceId: string, mode: 'payment' | 'subscri
   // Reuse existing Stripe customer to avoid duplicates on re-subscription
   let existingCustomerId: string | undefined
   if (user) {
-    const { data: customer } = await serviceClient
+    const { data: customer } = await getServiceClient()
       .from('stripe_customers')
       .select('stripe_customer_id')
       .eq('user_id', user.id)
@@ -67,7 +73,7 @@ export async function getBillingPortal() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) throw new Error('Unauthorized')
 
-  const { data: customer } = await serviceClient
+  const { data: customer } = await getServiceClient()
     .from('stripe_customers')
     .select('stripe_customer_id')
     .eq('user_id', user.id)
@@ -83,12 +89,12 @@ export async function getBillingPortal() {
   redirect(session.url!)
 }
 
-export async function getSubscription() {
+export async function getSubscription(): Promise<Subscription | null> {
   const supabase = await getAuthClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return null
 
-  const { data } = await serviceClient
+  const { data } = await getServiceClient()
     .from('subscriptions')
     .select('*')
     .eq('user_id', user.id)
