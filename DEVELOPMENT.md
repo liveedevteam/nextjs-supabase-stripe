@@ -15,7 +15,7 @@ See `SKILL.md` for full details on what the skill does.
 
 ## Project Overview
 
-This is the `@company/stripe` internal npm package — a reusable Stripe integration module for all company projects running the following tech stack:
+This is the `@liveedevteam/stripe` internal npm package — a reusable Stripe integration module for all company projects running the following tech stack:
 
 - **Next.js** (App Router)
 - **Next.js Server Actions**
@@ -28,7 +28,7 @@ The module handles both **one-time payments** and **subscriptions** via Stripe C
 ## Package Structure
 
 ```
-@company/stripe/
+@liveedevteam/stripe/
 ├── src/
 │   ├── client.ts               # Stripe singleton
 │   ├── actions/
@@ -40,8 +40,7 @@ The module handles both **one-time payments** and **subscriptions** via Stripe C
 │   │       ├── index.ts        # Event router
 │   │       ├── checkout.ts
 │   │       ├── subscription.ts
-│   │       ├── invoice.ts
-│   │       └── payment.ts
+│   │       └── invoice.ts
 │   └── scripts/
 │       └── backfill.ts         # Existing user backfill
 ```
@@ -62,7 +61,7 @@ let instance: Stripe | null = null
 export const getStripeClient = () => {
   if (!instance) {
     instance = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-      apiVersion: '2024-06-20',
+      apiVersion: '2026-05-27.dahlia',
       typescript: true,
     })
   }
@@ -171,37 +170,12 @@ supabase db push
 'use server'
 
 import { createServerClient } from '@supabase/ssr'
-import { createClient } from '@supabase/supabase-js'
 import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
-import { getStripeClient } from '../client'
+import { getServiceClient, getStripeClient } from '../client.js'
 
 // Reads the logged-in user from the request cookie session
-const getAuthClient = async () => {
-  const cookieStore = await cookies()
-  return createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll: () => cookieStore.getAll(),
-        setAll: (cookiesToSet) => {
-          try {
-            cookiesToSet.forEach(({ name, value, options }) =>
-              cookieStore.set(name, value, options)
-            )
-          } catch {}
-        },
-      },
-    }
-  )
-}
-
-// Service role client for DB writes that bypass RLS (webhooks, portal lookup)
-const serviceClient = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
+const getAuthClient = async () => { /* ... cookie-based SSR client ... */ }
 
 export async function createCheckout(priceId: string, mode: 'payment' | 'subscription') {
   const supabase = await getAuthClient()
@@ -209,10 +183,23 @@ export async function createCheckout(priceId: string, mode: 'payment' | 'subscri
 
   if (mode === 'subscription' && !user) throw new Error('Unauthorized')
 
+  // Reuse existing Stripe customer to avoid duplicates on re-subscription
+  let existingCustomerId: string | undefined
+  if (user) {
+    const { data: customer } = await getServiceClient()
+      .from('stripe_customers')
+      .select('stripe_customer_id')
+      .eq('user_id', user.id)
+      .single()
+    existingCustomerId = customer?.stripe_customer_id
+  }
+
   const stripe = getStripeClient()
   const session = await stripe.checkout.sessions.create({
     mode,
-    ...(user && { customer_email: user.email }),
+    ...(existingCustomerId
+      ? { customer: existingCustomerId }
+      : user && { customer_email: user.email }),
     line_items: [{ price: priceId, quantity: 1 }],
     success_url: `${process.env.NEXT_PUBLIC_APP_URL}/success`,
     cancel_url: `${process.env.NEXT_PUBLIC_APP_URL}/cancel`,
@@ -221,44 +208,28 @@ export async function createCheckout(priceId: string, mode: 'payment' | 'subscri
   redirect(session.url!)
 }
 
-export async function getBillingPortal() {
-  const supabase = await getAuthClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) throw new Error('Unauthorized')
-
-  const { data: customer } = await serviceClient
-    .from('stripe_customers')
-    .select('stripe_customer_id')
-    .eq('user_id', user.id)
-    .single()
-
-  if (!customer) throw new Error('No Stripe customer found for this user')
-
-  const stripe = getStripeClient()
-  const session = await stripe.billingPortal.sessions.create({
-    customer: customer.stripe_customer_id,
-    return_url: `${process.env.NEXT_PUBLIC_APP_URL}/settings/billing`,
-  })
-  redirect(session.url!)
-}
-
-export async function getSubscription() {
+export async function getSubscription(): Promise<Subscription | null> {
   const supabase = await getAuthClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return null
 
-  const { data } = await serviceClient
+  // Excludes terminal statuses (canceled, incomplete_expired); returns most recent otherwise
+  const { data } = await getServiceClient()
     .from('subscriptions')
     .select('*')
     .eq('user_id', user.id)
-    .single()
+    .neq('status', 'canceled')
+    .neq('status', 'incomplete_expired')
+    .order('current_period_end', { ascending: false })
+    .limit(1)
+    .maybeSingle()
 
   return data
 }
 
 export async function requireActiveSubscription() {
   const subscription = await getSubscription()
-  if (!subscription || subscription.status !== 'active') {
+  if (!subscription || !['active', 'trialing'].includes(subscription.status)) {
     redirect('/pricing')
   }
 }
@@ -320,27 +291,16 @@ export const notifySlack = async (
 - `slack` config is optional — omit it to disable notifications
 
 ```ts
-import { createClient } from '@supabase/supabase-js'
-import { getStripeClient } from '../client'
-import { handleEvent } from './events'
-import { notifySlack } from './notifier'
-
-interface WebhookHandlerOptions {
-  slack?: {
-    webhookUrl: string
-    channel?: string
-  }
-}
+import { getServiceClient, getStripeClient } from '../client.js'
+import { handleEvent } from './events/index.js'
+import { notifySlack } from './notifier.js'
 
 export const createWebhookHandler = (options: WebhookHandlerOptions = {}) =>
   async (req: Request): Promise<Response> => {
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    )
+    const supabase = getServiceClient()  // reuses singleton — not created per-request
     const stripe = getStripeClient()
     const sig = req.headers.get('stripe-signature')!
-    const body = await req.text()
+    const body = await req.text()       // must be text() for Stripe signature verification
 
     let event
     try {
@@ -349,28 +309,22 @@ export const createWebhookHandler = (options: WebhookHandlerOptions = {}) =>
       return new Response('Invalid signature', { status: 400 })
     }
 
-    // Idempotency check
-    const { data: existing } = await supabase
+    // Claim-before-process: insert first, let the unique constraint block concurrent retries
+    const { error: claimError } = await supabase
       .from('webhook_events')
-      .select('id')
-      .eq('id', event.id)
-      .single()
+      .insert({ id: event.id, type: event.type })
 
-    if (existing) return new Response('Already processed', { status: 200 })
+    if (claimError?.code === '23505') return new Response('Already processed', { status: 200 })
+    if (claimError) return new Response('Database error', { status: 500 })
 
     try {
       await handleEvent(event, supabase)
     } catch (error) {
-      // Notify Slack if configured
-      if (options.slack?.webhookUrl) {
-        await notifySlack(options.slack, event, error)
-      }
+      // Release claim so Stripe can retry
+      await supabase.from('webhook_events').delete().eq('id', event.id)
+      if (options.slack?.webhookUrl) await notifySlack(options.slack, event, error)
       return new Response('Internal error', { status: 500 })
     }
-
-    await supabase
-      .from('webhook_events')
-      .insert({ id: event.id, type: event.type })
 
     return new Response('OK', { status: 200 })
   }
@@ -380,7 +334,7 @@ Mount in your project:
 
 ```ts
 // app/api/webhooks/stripe/route.ts
-import { createWebhookHandler } from '@company/stripe/webhooks'
+import { createWebhookHandler } from '@liveedevteam/stripe/webhooks'
 
 // Without Slack (default)
 export const POST = createWebhookHandler()
@@ -406,8 +360,7 @@ export const POST = createWebhookHandler({
 | `customer.subscription.deleted` | Mark subscription canceled |
 | `invoice.payment_failed` | Notify user, trigger dunning |
 | `invoice.paid` | Record payment history |
-| `customer.subscription.trial_will_end` | Send trial expiry warning |
-| `payment_intent.succeeded` | Confirm one-time payment |
+| `customer.subscription.trial_will_end` | Intentional no-op — add your own notification logic |
 
 ```ts
 // src/webhooks/events/index.ts
@@ -426,8 +379,6 @@ export const handleEvent = async (event: Stripe.Event, supabase: SupabaseClient)
       return onInvoicePaid(event.data.object as Stripe.Invoice, supabase)
     case 'customer.subscription.trial_will_end':
       return onTrialWillEnd(event.data.object as Stripe.Subscription, supabase)
-    case 'payment_intent.succeeded':
-      return onPaymentIntentSucceeded(event.data.object as Stripe.PaymentIntent, supabase)
   }
 }
 ```
@@ -436,47 +387,18 @@ export const handleEvent = async (event: Stripe.Event, supabase: SupabaseClient)
 
 ### 7. Backfill Script (`src/scripts/backfill.ts`)
 
-Run once for projects that go live before Stripe is integrated.
-Creates a Stripe customer for every existing auth user.
+Run once for existing projects that go live after Stripe is integrated. Syncs existing Stripe
+customers into the `stripe_customers` table — does **not** create new Stripe customers.
 
 ```bash
-npx ts-node src/scripts/backfill.ts
+node node_modules/@liveedevteam/stripe/dist/scripts/backfill.js
 ```
 
-- Safe to re-run — skips users who already have a `stripe_customer_id`
-- 200ms delay per user to respect Stripe rate limits
-- Always test in staging first
-
-```ts
-export const backfillStripeCustomers = async () => {
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  )
-  const stripe = getStripeClient()
-
-  const { data: users } = await supabase.auth.admin.listUsers()
-
-  for (const user of users.users) {
-    const { data: existing } = await supabase
-      .from('stripe_customers')
-      .select('id')
-      .eq('user_id', user.id)
-      .single()
-
-    if (existing) continue // skip already migrated
-
-    const customer = await stripe.customers.create({ email: user.email! })
-
-    await supabase.from('stripe_customers').insert({
-      user_id: user.id,
-      stripe_customer_id: customer.id,
-    })
-
-    await new Promise(r => setTimeout(r, 200)) // rate limit safe
-  }
-}
-```
+- Paginates through all auth users (1000 per page)
+- Skips users who already have a `stripe_customer_id`
+- Looks up Stripe customer by email — users who changed email after paying may be missed
+- Retries on Stripe 429 rate-limit errors with exponential backoff
+- Always test against staging first
 
 ---
 
@@ -487,7 +409,7 @@ export const backfillStripeCustomers = async () => {
 ```tsx
 // components/CheckoutButton.tsx
 'use client'
-import { createCheckout } from '@company/stripe/actions'
+import { createCheckout } from '@liveedevteam/stripe/actions'
 
 export const CheckoutButton = ({ priceId, mode }: {
   priceId: string
@@ -503,7 +425,7 @@ export const CheckoutButton = ({ priceId, mode }: {
 
 ```tsx
 'use client'
-import { getBillingPortal } from '@company/stripe/actions'
+import { getBillingPortal } from '@liveedevteam/stripe/actions'
 
 export const BillingPortalButton = () => (
   <form action={getBillingPortal}>
@@ -516,7 +438,7 @@ export const BillingPortalButton = () => (
 
 ```ts
 // app/dashboard/page.tsx
-import { requireActiveSubscription } from '@company/stripe/actions'
+import { requireActiveSubscription } from '@liveedevteam/stripe/actions'
 
 export default async function DashboardPage() {
   await requireActiveSubscription() // redirects to /pricing if not active
@@ -545,12 +467,12 @@ SLACK_WEBHOOK_URL=https://hooks.slack.com/services/xxx/xxx/xxx
 
 ## Implementation Checklist — New Project
 
-- [ ] `pnpm add @company/stripe stripe @supabase/ssr`
+- [ ] `pnpm add @liveedevteam/stripe stripe @supabase/ssr`
 - [ ] Add env vars
 - [ ] `supabase init` (if not already)
 - [ ] `supabase migration new create_stripe_tables` — paste SQL, then `supabase db push`
 - [ ] Create `app/api/webhooks/stripe/route.ts`
-- [ ] Use Server Actions from `@company/stripe/actions` in components
+- [ ] Use Server Actions from `@liveedevteam/stripe/actions` in components
 - [ ] Test: `stripe listen --forward-to localhost:3000/api/webhooks/stripe`
 - [ ] (Optional) Add `SLACK_WEBHOOK_URL` env var and pass `slack` config to `createWebhookHandler`
 

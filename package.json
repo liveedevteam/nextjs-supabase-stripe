@@ -1,6 +1,6 @@
 {
   "name": "@liveedevteam/stripe",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "Stripe integration module for Next.js + Supabase — one-time payments, subscriptions, webhooks",
   "type": "module",
   "exports": {
@@ -13,6 +13,11 @@
       "types": "./dist/webhooks/handler.d.ts",
       "import": "./dist/webhooks/handler.js",
       "require": "./dist/webhooks/handler.cjs"
+    },
+    "./types": {
+      "types": "./dist/types.d.ts",
+      "import": "./dist/types.js",
+      "require": "./dist/types.cjs"
     }
   },
   "files": [
@@ -31,7 +36,7 @@
     "@supabase/ssr": ">=0.5",
     "@supabase/supabase-js": ">=2",
     "next": ">=14",
-    "stripe": ">=16"
+    "stripe": ">=22"
   },
   "devDependencies": {
     "@supabase/ssr": "^0.12.0",

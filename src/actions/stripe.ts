@@ -4,18 +4,9 @@ import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { getServiceClient, getStripeClient } from '../client.js'
+import type { Subscription } from '../types.js'
 
-export type Subscription = {
-  id: string
-  user_id: string
-  stripe_subscription_id: string
-  stripe_price_id: string
-  status: 'active' | 'canceled' | 'incomplete' | 'incomplete_expired' | 'past_due' | 'trialing' | 'unpaid' | 'paused'
-  current_period_start: string
-  current_period_end: string
-  cancel_at_period_end: boolean
-  created_at: string
-}
+export type { Subscription }
 
 const getAuthClient = async () => {
   const cookieStore = await cookies()
@@ -98,6 +89,8 @@ export async function getSubscription(): Promise<Subscription | null> {
     .from('subscriptions')
     .select('*')
     .eq('user_id', user.id)
+    .neq('status', 'canceled')
+    .neq('status', 'incomplete_expired')
     .order('current_period_end', { ascending: false })
     .limit(1)
     .maybeSingle()

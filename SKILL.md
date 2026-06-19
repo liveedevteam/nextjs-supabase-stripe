@@ -87,6 +87,7 @@ create table subscriptions (
   current_period_start timestamptz,
   current_period_end timestamptz,
   cancel_at_period_end boolean default false,
+  cancel_at timestamptz,
   created_at timestamptz default now()
 );
 
@@ -100,27 +101,26 @@ create table orders (
   created_at timestamptz default now()
 );
 
-create table products (
-  id text primary key,
-  name text not null,
-  description text,
-  active boolean default true
-);
-
-create table prices (
-  id text primary key,
-  product_id text references products(id) not null,
-  unit_amount integer,
-  currency text not null,
-  interval text,
-  active boolean default true
-);
-
 create table webhook_events (
   id text primary key,
   type text not null,
   processed_at timestamptz default now()
 );
+
+-- Row Level Security
+alter table stripe_customers enable row level security;
+alter table subscriptions enable row level security;
+alter table orders enable row level security;
+alter table webhook_events enable row level security;
+
+create policy "users_read_own_stripe_customer" on stripe_customers
+  for select to authenticated using (auth.uid() = user_id);
+
+create policy "users_read_own_subscriptions" on subscriptions
+  for select to authenticated using (auth.uid() = user_id);
+
+create policy "users_read_own_orders" on orders
+  for select to authenticated using (auth.uid() = user_id);
 ```
 
 ### Apply migration to production

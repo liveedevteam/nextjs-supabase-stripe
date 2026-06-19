@@ -21,9 +21,15 @@ export const backfillStripeCustomers = async () => {
   const supabase = getServiceClient()
   const stripe = getStripeClient()
 
-  const { data: users } = await supabase.auth.admin.listUsers()
+  const perPage = 1000
+  let page = 1
 
-  for (const user of users.users) {
+  while (true) {
+    const { data: batch, error } = await supabase.auth.admin.listUsers({ page, perPage })
+    if (error) throw error
+    if (!batch.users.length) break
+
+  for (const user of batch.users) {
     const { data: existing } = await supabase
       .from('stripe_customers')
       .select('id')
@@ -42,6 +48,10 @@ export const backfillStripeCustomers = async () => {
     })
 
     await new Promise(r => setTimeout(r, 200))
+  }
+
+  if (batch.users.length < perPage) break
+  page++
   }
 }
 

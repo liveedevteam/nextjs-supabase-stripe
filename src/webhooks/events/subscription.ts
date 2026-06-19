@@ -32,6 +32,7 @@ export const onSubscriptionUpdated = async (
       current_period_start: new Date(item.current_period_start * 1000).toISOString(),
       current_period_end: new Date(item.current_period_end * 1000).toISOString(),
       cancel_at_period_end: subscription.cancel_at_period_end,
+      cancel_at: subscription.cancel_at ? new Date(subscription.cancel_at * 1000).toISOString() : null,
     },
     { onConflict: 'stripe_subscription_id' }
   )
