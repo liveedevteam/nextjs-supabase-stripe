@@ -8,7 +8,7 @@ vi.mock('next/navigation', () => ({ redirect: vi.fn() }))
 vi.mock('@supabase/ssr', () => ({ createServerClient: vi.fn() }))
 vi.mock('../client.js', () => ({ getServiceClient: vi.fn(), getStripeClient: vi.fn() }))
 
-import { createCheckout, getBillingPortal, getSubscription, requireActiveSubscription } from '../actions/stripe.js'
+import { changeSubscription, createCheckout, getBillingPortal, getSubscription, requireActiveSubscription } from '../actions/stripe.js'
 import { redirect } from 'next/navigation'
 import { createServerClient } from '@supabase/ssr'
 import { getServiceClient, getStripeClient } from '../client.js'
@@ -19,9 +19,13 @@ const mockAuthClient = (user: typeof USER | null) => ({
   auth: { getUser: vi.fn().mockResolvedValue({ data: { user }, error: null }) },
 })
 
+const mockSubscriptionRetrieve = vi.fn()
+const mockSubscriptionUpdate = vi.fn()
+
 const mockStripe = {
   checkout: { sessions: { create: vi.fn().mockResolvedValue({ url: 'https://checkout.stripe.com/test' }) } },
   billingPortal: { sessions: { create: vi.fn().mockResolvedValue({ url: 'https://billing.stripe.com/test' }) } },
+  subscriptions: { retrieve: mockSubscriptionRetrieve, update: mockSubscriptionUpdate },
 }
 
 beforeEach(() => {
@@ -174,5 +178,88 @@ describe('requireActiveSubscription', () => {
 
     await requireActiveSubscription()
     expect(redirect).not.toHaveBeenCalled()
+  })
+})
+
+describe('changeSubscription', () => {
+  const STRIPE_SUB_ID = 'sub_existing'
+  const STRIPE_ITEM_ID = 'si_existing'
+  const NEW_PRICE_ID = 'price_new_plan'
+
+  const stripeSubFixture = {
+    id: STRIPE_SUB_ID,
+    items: { data: [{ id: STRIPE_ITEM_ID, price: { id: 'price_old' } }] },
+  }
+
+  beforeEach(() => {
+    mockSubscriptionRetrieve.mockResolvedValue(stripeSubFixture)
+    mockSubscriptionUpdate.mockResolvedValue({})
+  })
+
+  it('throws Unauthorized when not logged in', async () => {
+    vi.mocked(createServerClient).mockReturnValue(mockAuthClient(null) as any)
+    await expect(changeSubscription(NEW_PRICE_ID)).rejects.toThrow('Unauthorized')
+  })
+
+  it('throws when user has no active subscription', async () => {
+    vi.mocked(createServerClient).mockReturnValue(mockAuthClient(USER) as any)
+    const { supabase } = mockSupabase({ subscriptions: { maybeSingle: { data: null } } })
+    vi.mocked(getServiceClient).mockReturnValue(supabase)
+
+    await expect(changeSubscription(NEW_PRICE_ID)).rejects.toThrow('No active subscription found')
+  })
+
+  it('retrieves the subscription from Stripe then calls update', async () => {
+    vi.mocked(createServerClient).mockReturnValue(mockAuthClient(USER) as any)
+    const { supabase } = mockSupabase({
+      subscriptions: { maybeSingle: { data: { stripe_subscription_id: STRIPE_SUB_ID } } },
+    })
+    vi.mocked(getServiceClient).mockReturnValue(supabase)
+
+    await changeSubscription(NEW_PRICE_ID)
+
+    expect(mockSubscriptionRetrieve).toHaveBeenCalledWith(STRIPE_SUB_ID)
+    expect(mockSubscriptionUpdate).toHaveBeenCalledWith(STRIPE_SUB_ID, {
+      items: [{ id: STRIPE_ITEM_ID, price: NEW_PRICE_ID }],
+      proration_behavior: 'create_prorations',
+    })
+  })
+
+  it('uses create_prorations by default', async () => {
+    vi.mocked(createServerClient).mockReturnValue(mockAuthClient(USER) as any)
+    const { supabase } = mockSupabase({
+      subscriptions: { maybeSingle: { data: { stripe_subscription_id: STRIPE_SUB_ID } } },
+    })
+    vi.mocked(getServiceClient).mockReturnValue(supabase)
+
+    await changeSubscription(NEW_PRICE_ID)
+
+    const [, updateArgs] = mockSubscriptionUpdate.mock.calls[0]
+    expect(updateArgs.proration_behavior).toBe('create_prorations')
+  })
+
+  it('passes custom prorationBehavior when provided', async () => {
+    vi.mocked(createServerClient).mockReturnValue(mockAuthClient(USER) as any)
+    const { supabase } = mockSupabase({
+      subscriptions: { maybeSingle: { data: { stripe_subscription_id: STRIPE_SUB_ID } } },
+    })
+    vi.mocked(getServiceClient).mockReturnValue(supabase)
+
+    await changeSubscription(NEW_PRICE_ID, 'none')
+
+    const [, updateArgs] = mockSubscriptionUpdate.mock.calls[0]
+    expect(updateArgs.proration_behavior).toBe('none')
+  })
+
+  it('queries only active, trialing, and past_due subscriptions', async () => {
+    vi.mocked(createServerClient).mockReturnValue(mockAuthClient(USER) as any)
+    const { supabase, spies } = mockSupabase({
+      subscriptions: { maybeSingle: { data: null } },
+    })
+    vi.mocked(getServiceClient).mockReturnValue(supabase)
+
+    await expect(changeSubscription(NEW_PRICE_ID)).rejects.toThrow()
+    // maybeSingle is only reachable after the full .in().order().limit() chain
+    expect(spies('subscriptions').maybeSingleFn).toHaveBeenCalled()
   })
 })

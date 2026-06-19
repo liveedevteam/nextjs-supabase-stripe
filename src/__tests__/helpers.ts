@@ -38,9 +38,10 @@ export function mockSupabase(config: Record<string, TableConfig> = {}) {
     const deleteEqFn = vi.fn(() => Promise.resolve({ error: t.delete?.error ?? null }))
     const deleteFn = vi.fn(() => ({ eq: deleteEqFn }))
 
-    // Builds a chainable neq/order/limit object that terminates at maybeSingle
+    // Builds a chainable neq/in/order/limit object that terminates at maybeSingle
     const neqChain = (): any => ({
       neq: vi.fn(() => neqChain()),
+      in: vi.fn(() => neqChain()),
       order: vi.fn(() => ({
         limit: vi.fn(() => ({ maybeSingle: maybeSingleFn })),
       })),
@@ -51,6 +52,7 @@ export function mockSupabase(config: Record<string, TableConfig> = {}) {
         eq: vi.fn(() => ({
           single: singleFn,
           neq: vi.fn(() => neqChain()),
+          in: vi.fn(() => neqChain()),
         })),
       })),
       insert: insertFn,
