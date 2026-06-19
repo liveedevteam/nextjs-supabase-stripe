@@ -25,3 +25,45 @@ jobs:
       - run: pnpm typecheck
       - run: pnpm build
       - run: pnpm test
+
+  integration:
+    runs-on: ubuntu-latest
+    # Only on main pushes — not every PR — to avoid rate-limiting the Stripe test API
+    # and to keep PR check latency low. Merge to main is the integration confidence gate.
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Start local Supabase
+        run: supabase start
+
+      - name: Capture Supabase credentials
+        run: |
+          SUPA_SERVICE_KEY=$(supabase status | grep 'service_role key' | awk '{print $NF}')
+          SUPA_DB_URL=$(supabase status | grep 'DB URL' | awk '{print $NF}')
+          echo "SUPABASE_SERVICE_ROLE_KEY=${SUPA_SERVICE_KEY}" >> $GITHUB_ENV
+          echo "SUPA_DB_URL=${SUPA_DB_URL}" >> $GITHUB_ENV
+
+      - name: Apply integration test schema
+        run: psql "$SUPA_DB_URL" < tests/integration/schema.sql
+
+      - name: Run integration tests
+        run: pnpm test:integration
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: http://localhost:54321
+          SUPABASE_SERVICE_ROLE_KEY: ${{ env.SUPABASE_SERVICE_ROLE_KEY }}
