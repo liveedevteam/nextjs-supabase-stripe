@@ -37,7 +37,7 @@ export const createWebhookHandler = (options: WebhookHandlerOptions = {}) =>
       // Release the claim so Stripe can retry
       await supabase.from('webhook_events').delete().eq('id', event.id)
       if (options.slack?.webhookUrl) {
-        await notifySlack(options.slack, event, error)
+        await notifySlack(options.slack, event, error).catch(() => {})
       }
       return new Response('Internal error', { status: 500 })
     }
