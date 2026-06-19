@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.1.7] - 2026-06-19
+
+### Added
+- `cancelSubscription(immediately?)` server action — soft cancel (default, sets `cancel_at_period_end: true`) or immediate cancel (`stripe.subscriptions.cancel`); DB updated via existing webhook handlers in both cases
+- `Database` type exported from `@liveedevteam/stripe/types` — covers `Row`, `Insert`, `Update` for all four package-owned tables; consumers can merge it with their own generated types
+
+### Changed
+- `Subscription` type is now derived from `Database['public']['Tables']['subscriptions']['Row']` so it stays in sync with the schema automatically
+- `getServiceClient()` now returns `SupabaseClient<Database>` — all `.from()` calls inside the package are type-checked against the schema at compile time
+- All event handlers updated to accept `SupabaseClient<Database>`, catching column-name typos at compile time
+
 ## [0.1.6] - 2026-06-19
 
 ### Added

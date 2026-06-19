@@ -8,9 +8,10 @@ It helps Claude give accurate assistance when you work with `@liveedevteam/strip
 ## What this package exports
 
 ```ts
-import { createCheckout, getBillingPortal, getSubscription, requireActiveSubscription, changeSubscription } from '@liveedevteam/stripe/actions'
+import { createCheckout, getBillingPortal, getSubscription, requireActiveSubscription, changeSubscription, cancelSubscription } from '@liveedevteam/stripe/actions'
 import { createWebhookHandler } from '@liveedevteam/stripe/webhooks'
 import { buildWebhookRequest, stripeFixtures } from '@liveedevteam/stripe/testing'
+import type { Subscription, Database } from '@liveedevteam/stripe/types'
 ```
 
 ---
@@ -59,6 +60,19 @@ requireActiveSubscription(): Promise<void>
 
 - Redirects to `/pricing` if the user has no active subscription.
 - Safe for anonymous users — they get redirected to `/pricing`.
+
+### `cancelSubscription(immediately?)`
+
+```ts
+cancelSubscription(immediately?: boolean): Promise<void>
+```
+
+- Cancels the user's current subscription.
+- `immediately = false` (default): sets `cancel_at_period_end: true` — user keeps access until end of billing period. Stripe fires `customer.subscription.updated`.
+- `immediately = true`: calls `stripe.subscriptions.cancel` — access cut off immediately. Stripe fires `customer.subscription.deleted`.
+- In both cases the DB is updated automatically by the existing webhook handlers.
+- Throws `Error('Unauthorized')` if not logged in.
+- Throws `Error('No active subscription found')` if no `active`, `trialing`, or `past_due` subscription exists.
 
 ### `changeSubscription(newPriceId, prorationBehavior?)`
 
@@ -110,6 +124,7 @@ export const POST = createWebhookHandler({ slack: { webhookUrl: process.env.SLAC
 | `getSubscription()` | Returns `null` |
 | `requireActiveSubscription()` | Redirects to `/pricing` |
 | `changeSubscription(priceId)` | Throws `Unauthorized` |
+| `cancelSubscription()` | Throws `Unauthorized` |
 
 **Important:** Never render `<CheckoutButton mode="subscription">` or `<BillingPortalButton>` for anonymous users without a session guard — they will throw on submit.
 
