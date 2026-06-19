@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.1.4] - 2026-06-19
+
+### Fixed
+- Slack failure can no longer mask the 500 response to Stripe — `notifySlack` is now fire-and-forget so a Slack outage does not prevent Stripe from retrying the webhook
+
+### Added
+- Full test suite: 53 tests across 6 files covering all webhook event handlers, event router, webhook handler, and server actions
+- CI now runs `pnpm test` in addition to typecheck and build
+
 ## [0.1.3] - 2026-06-19
 
 ### Fixed
