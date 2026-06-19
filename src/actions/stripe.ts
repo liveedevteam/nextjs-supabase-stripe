@@ -98,6 +98,37 @@ export async function getSubscription(): Promise<Subscription | null> {
   return data
 }
 
+export async function changeSubscription(
+  newPriceId: string,
+  prorationBehavior: 'create_prorations' | 'none' | 'always_invoice' = 'create_prorations'
+): Promise<void> {
+  const authClient = await getAuthClient()
+  const { data: { user } } = await authClient.auth.getUser()
+  if (!user) throw new Error('Unauthorized')
+
+  const { data: sub } = await getServiceClient()
+    .from('subscriptions')
+    .select('stripe_subscription_id')
+    .eq('user_id', user.id)
+    .in('status', ['active', 'trialing', 'past_due'])
+    .order('current_period_end', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  if (!sub) throw new Error('No active subscription found')
+
+  const stripe = getStripeClient()
+  const stripeSub = await stripe.subscriptions.retrieve(sub.stripe_subscription_id)
+  const item = stripeSub.items.data[0]
+  if (!item) throw new Error(`Subscription ${sub.stripe_subscription_id} has no items`)
+
+  await stripe.subscriptions.update(sub.stripe_subscription_id, {
+    items: [{ id: item.id, price: newPriceId }],
+    proration_behavior: prorationBehavior,
+  })
+  // customer.subscription.updated webhook fires and the existing handler updates the DB
+}
+
 export async function requireActiveSubscription() {
   const subscription = await getSubscription()
   if (!subscription || !['active', 'trialing'].includes(subscription.status)) {
