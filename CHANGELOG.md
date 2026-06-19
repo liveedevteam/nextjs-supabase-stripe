@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.1.8] - 2026-06-19
+
+### Added
+- Integration test suite (15 tests, 4 files) against real local Supabase — no mocks for DB or crypto:
+  - `webhook.test.ts` — handler routing: valid signature, invalid signature, claim deletion on handler failure
+  - `checkout.test.ts` — `orders` and `stripe_customers` writes: anonymous payment, authenticated payment, subscription upsert, double-checkout idempotency
+  - `subscription.test.ts` — full lifecycle: created, dahlia regression (period dates from `items.data[0]`), updated, deleted, `invoice.paid`, `invoice.payment_failed`; no-op guard pattern on all update tests
+  - `idempotency.test.ts` — same event ID blocked by real DB `UNIQUE` constraint; two event IDs for same subscription (last write wins)
+- `tests/integration/schema.sql` — canonical test DB schema with `ON DELETE CASCADE` for safe per-test cleanup via `auth.admin.deleteUser`
+- `supabase/config.toml` — minimal local Supabase config (studio/inbucket/storage/analytics disabled)
+- CI `integration` job — runs on main pushes only; starts local Supabase, applies test schema, runs `pnpm test:integration`
+
+### Changed
+- `vitest.config.ts` scoped to `src/**/*.test.ts` so integration tests don't appear as skipped in `pnpm test`
+
 ## [0.1.7] - 2026-06-19
 
 ### Added
