@@ -8,8 +8,9 @@ It helps Claude give accurate assistance when you work with `@liveedevteam/strip
 ## What this package exports
 
 ```ts
-import { createCheckout, getBillingPortal, getSubscription, requireActiveSubscription } from '@liveedevteam/stripe/actions'
+import { createCheckout, getBillingPortal, getSubscription, requireActiveSubscription, changeSubscription } from '@liveedevteam/stripe/actions'
 import { createWebhookHandler } from '@liveedevteam/stripe/webhooks'
+import { buildWebhookRequest, stripeFixtures } from '@liveedevteam/stripe/testing'
 ```
 
 ---
@@ -58,6 +59,22 @@ requireActiveSubscription(): Promise<void>
 
 - Redirects to `/pricing` if the user has no active subscription.
 - Safe for anonymous users — they get redirected to `/pricing`.
+
+### `changeSubscription(newPriceId, prorationBehavior?)`
+
+```ts
+changeSubscription(
+  newPriceId: string,
+  prorationBehavior?: 'create_prorations' | 'none' | 'always_invoice'
+): Promise<void>
+```
+
+- Upgrades or downgrades the user's current subscription to a new price.
+- Throws `Error('Unauthorized')` if not logged in.
+- Throws `Error('No active subscription found')` if the user has no `active`, `trialing`, or `past_due` subscription.
+- `prorationBehavior` defaults to `'create_prorations'` (credit/charge deferred to next invoice).
+- Does NOT redirect. Returns `Promise<void>` — call from a Server Action wrapper.
+- The DB is updated automatically when Stripe fires `customer.subscription.updated`.
 - Use at the top of any page that requires an active subscription.
 
 ---
@@ -92,6 +109,7 @@ export const POST = createWebhookHandler({ slack: { webhookUrl: process.env.SLAC
 | `getBillingPortal()` | Throws `Unauthorized` |
 | `getSubscription()` | Returns `null` |
 | `requireActiveSubscription()` | Redirects to `/pricing` |
+| `changeSubscription(priceId)` | Throws `Unauthorized` |
 
 **Important:** Never render `<CheckoutButton mode="subscription">` or `<BillingPortalButton>` for anonymous users without a session guard — they will throw on submit.
 

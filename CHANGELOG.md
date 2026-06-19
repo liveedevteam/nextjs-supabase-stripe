@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.1.6] - 2026-06-19
+
+### Added
+- `changeSubscription(newPriceId, prorationBehavior?)` server action — upgrades or downgrades the user's current subscription; retrieves the subscription item ID from Stripe and calls `subscriptions.update`; the existing `customer.subscription.updated` webhook handler writes the new price and period to the DB automatically
+- `prorationBehavior` accepts `'create_prorations'` (default), `'none'`, or `'always_invoice'`
+
 ## [0.1.5] - 2026-06-19
 
 ### Added
