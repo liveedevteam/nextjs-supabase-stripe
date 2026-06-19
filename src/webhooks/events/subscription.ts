@@ -1,9 +1,10 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type Stripe from 'stripe'
+import type { Database } from '../../database.types.js'
 
 const resolveUserId = async (
   stripeCustomerId: string,
-  supabase: SupabaseClient
+  supabase: SupabaseClient<Database>
 ): Promise<string> => {
   const { data } = await supabase
     .from('stripe_customers')
@@ -16,7 +17,7 @@ const resolveUserId = async (
 
 export const onSubscriptionUpdated = async (
   subscription: Stripe.Subscription,
-  supabase: SupabaseClient
+  supabase: SupabaseClient<Database>
 ) => {
   const userId = await resolveUserId(subscription.customer as string, supabase)
   const item = subscription.items.data[0]
@@ -41,7 +42,7 @@ export const onSubscriptionUpdated = async (
 
 export const onSubscriptionDeleted = async (
   subscription: Stripe.Subscription,
-  supabase: SupabaseClient
+  supabase: SupabaseClient<Database>
 ) => {
   const { error } = await supabase
     .from('subscriptions')

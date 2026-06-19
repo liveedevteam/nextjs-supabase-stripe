@@ -1,5 +1,6 @@
 import { SupabaseClient, createClient } from '@supabase/supabase-js'
 import Stripe from 'stripe'
+import type { Database } from './database.types.js'
 
 let stripeInstance: Stripe | null = null
 
@@ -13,11 +14,11 @@ export const getStripeClient = () => {
   return stripeInstance
 }
 
-let supabaseInstance: SupabaseClient | null = null
+let supabaseInstance: SupabaseClient<Database> | null = null
 
-export const getServiceClient = (): SupabaseClient => {
+export const getServiceClient = (): SupabaseClient<Database> => {
   if (!supabaseInstance) {
-    supabaseInstance = createClient(
+    supabaseInstance = createClient<Database>(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.SUPABASE_SERVICE_ROLE_KEY!
     )

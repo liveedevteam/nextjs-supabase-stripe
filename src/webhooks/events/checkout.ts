@@ -1,9 +1,10 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type Stripe from 'stripe'
+import type { Database } from '../../database.types.js'
 
 export const onCheckoutCompleted = async (
   session: Stripe.Checkout.Session,
-  supabase: SupabaseClient
+  supabase: SupabaseClient<Database>
 ) => {
   const userId = session.metadata?.user_id ?? null
 

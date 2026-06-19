@@ -1,10 +1,11 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type Stripe from 'stripe'
+import type { Database } from '../../database.types.js'
 import { onCheckoutCompleted } from './checkout.js'
 import { onInvoicePaid, onPaymentFailed, onTrialWillEnd } from './invoice.js'
 import { onSubscriptionDeleted, onSubscriptionUpdated } from './subscription.js'
 
-export const handleEvent = async (event: Stripe.Event, supabase: SupabaseClient) => {
+export const handleEvent = async (event: Stripe.Event, supabase: SupabaseClient<Database>) => {
   switch (event.type) {
     case 'checkout.session.completed':
       return onCheckoutCompleted(event.data.object as Stripe.Checkout.Session, supabase)

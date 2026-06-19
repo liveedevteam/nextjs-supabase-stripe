@@ -1,5 +1,6 @@
 import { vi } from 'vitest'
 import type { SupabaseClient } from '@supabase/supabase-js'
+import type { Database } from '../database.types.js'
 
 type Result = { data?: any; error?: any }
 type TableConfig = {
@@ -67,7 +68,7 @@ export function mockSupabase(config: Record<string, TableConfig> = {}) {
 
   const supabase = {
     from: vi.fn((table: string) => getOrCreate(table).builder),
-  } as unknown as SupabaseClient
+  } as unknown as SupabaseClient<Database>
 
   // Returns the recorded spy functions for a given table for assertions
   const spies = (table: string): TableSpies => {

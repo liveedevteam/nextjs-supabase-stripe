@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type Stripe from 'stripe'
+import type { Database } from '../../database.types.js'
 
 const getSubscriptionId = (invoice: Stripe.Invoice): string | null => {
   const sub = invoice.parent?.subscription_details?.subscription
@@ -9,7 +10,7 @@ const getSubscriptionId = (invoice: Stripe.Invoice): string | null => {
 
 export const onInvoicePaid = async (
   invoice: Stripe.Invoice,
-  supabase: SupabaseClient
+  supabase: SupabaseClient<Database>
 ) => {
   const subscriptionId = getSubscriptionId(invoice)
   if (!subscriptionId) return
@@ -27,7 +28,7 @@ export const onInvoicePaid = async (
 
 export const onPaymentFailed = async (
   invoice: Stripe.Invoice,
-  supabase: SupabaseClient
+  supabase: SupabaseClient<Database>
 ) => {
   const subscriptionId = getSubscriptionId(invoice)
   if (!subscriptionId) return
@@ -45,5 +46,5 @@ export const onPaymentFailed = async (
 // depending on your Stripe dashboard settings.
 export const onTrialWillEnd = async (
   _subscription: Stripe.Subscription,
-  _supabase: SupabaseClient
+  _supabase: SupabaseClient<Database>
 ) => {}

@@ -50,6 +50,7 @@ export type Database = {
           status?: string
           created_at?: string
         }
+        Relationships: []
       }
       stripe_customers: {
         Row: {
@@ -67,6 +68,7 @@ export type Database = {
           stripe_customer_id?: string
           created_at?: string
         }
+        Relationships: []
       }
       subscriptions: {
         Row: {
@@ -105,6 +107,7 @@ export type Database = {
           cancel_at?: string | null
           created_at?: string
         }
+        Relationships: []
       }
       webhook_events: {
         Row: {
@@ -122,11 +125,14 @@ export type Database = {
           type?: string
           created_at?: string
         }
+        Relationships: []
       }
     }
-    Views: Record<string, never>
-    Functions: Record<string, never>
-    Enums: Record<string, never>
-    CompositeTypes: Record<string, never>
+    // Use empty mapped type so Supabase's GenericSchema constraint is satisfied
+    // without a string index signature that would poison column type lookups
+    Views: { [_ in never]: never }
+    Functions: { [_ in never]: never }
+    Enums: { [_ in never]: never }
+    CompositeTypes: { [_ in never]: never }
   }
 }
