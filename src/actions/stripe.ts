@@ -98,6 +98,34 @@ export async function getSubscription(): Promise<Subscription | null> {
   return data
 }
 
+export async function cancelSubscription(immediately = false): Promise<void> {
+  const authClient = await getAuthClient()
+  const { data: { user } } = await authClient.auth.getUser()
+  if (!user) throw new Error('Unauthorized')
+
+  const { data: sub } = await getServiceClient()
+    .from('subscriptions')
+    .select('stripe_subscription_id')
+    .eq('user_id', user.id)
+    .in('status', ['active', 'trialing', 'past_due'])
+    .order('current_period_end', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  if (!sub) throw new Error('No active subscription found')
+
+  const stripe = getStripeClient()
+  if (immediately) {
+    await stripe.subscriptions.cancel(sub.stripe_subscription_id)
+    // customer.subscription.deleted fires → existing handler sets status: 'canceled'
+  } else {
+    await stripe.subscriptions.update(sub.stripe_subscription_id, {
+      cancel_at_period_end: true,
+    })
+    // customer.subscription.updated fires → existing handler writes cancel_at_period_end: true
+  }
+}
+
 export async function changeSubscription(
   newPriceId: string,
   prorationBehavior: 'create_prorations' | 'none' | 'always_invoice' = 'create_prorations'
