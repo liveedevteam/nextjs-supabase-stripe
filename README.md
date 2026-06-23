@@ -213,8 +213,47 @@ export default async function DashboardPage() {
 ```ts
 import { getSubscription } from '@liveedevteam/stripe/actions'
 
-const subscription = await getSubscription() // returns null for anonymous/no subscription
+const subscription = await getSubscription() // null for anonymous or no subscription
+if (subscription?.status === 'active' || subscription?.status === 'trialing') {
+  // has access
+}
 ```
+
+### Cancel a subscription
+
+```ts
+import { cancelSubscription } from '@liveedevteam/stripe/actions'
+
+// Cancel at period end (default) — user keeps access until billing period ends
+await cancelSubscription()
+
+// Cancel immediately
+await cancelSubscription(true)
+```
+
+The DB is updated automatically via `customer.subscription.updated` / `customer.subscription.deleted` webhooks.
+
+### Upgrade or downgrade
+
+```ts
+import { changeSubscription } from '@liveedevteam/stripe/actions'
+
+await changeSubscription('price_new_plan_id')
+
+// Control proration
+await changeSubscription('price_new_plan_id', 'none')           // no proration
+await changeSubscription('price_new_plan_id', 'always_invoice') // invoice immediately
+```
+
+The DB is updated automatically via `customer.subscription.updated` webhook.
+
+## TypeScript types
+
+```ts
+import type { Subscription, Database } from '@liveedevteam/stripe/types'
+```
+
+`Subscription` is derived directly from the `Database` schema so it stays in sync with your table.
 
 ## Anonymous user support
 
@@ -225,6 +264,8 @@ const subscription = await getSubscription() // returns null for anonymous/no su
 | `getBillingPortal()` | Throws `Unauthorized` |
 | `getSubscription()` | Returns `null` |
 | `requireActiveSubscription()` | Redirects to `/pricing` |
+| `cancelSubscription()` | Throws `Unauthorized` |
+| `changeSubscription(priceId)` | Throws `Unauthorized` |
 
 ## Local testing
 
@@ -233,15 +274,35 @@ stripe listen --forward-to localhost:3000/api/webhooks/stripe
 stripe trigger checkout.session.completed
 ```
 
+## Testing
+
+```ts
+import { buildWebhookRequest, stripeFixtures } from '@liveedevteam/stripe/testing'
+```
+
+Build a signed webhook request to pass directly to your route handler in tests:
+
+```ts
+const req = buildWebhookRequest(
+  'checkout.session.completed',
+  stripeFixtures.checkoutSessionCompleted({ mode: 'subscription', userId: 'user-1' }),
+  { secret: process.env.STRIPE_WEBHOOK_SECRET! }
+)
+const res = await POST(req)
+expect(res.status).toBe(200)
+```
+
+Available fixtures: `checkoutSessionCompleted`, `subscription`, `invoice`. All are shaped for Stripe API version `2026-05-27.dahlia`.
+
 ## Existing users backfill
 
-If you integrated Stripe after users already existed, create a Stripe customer for each:
+If users already had Stripe subscriptions before you installed this package, sync them into the `stripe_customers` table:
 
 ```bash
 node node_modules/@liveedevteam/stripe/dist/scripts/backfill.js
 ```
 
-Always run against staging first.
+The script looks up each user by email in Stripe and records the match — it **does not create new Stripe customers**. Always run against staging first.
 
 ## License
 

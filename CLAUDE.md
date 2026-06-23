@@ -48,7 +48,8 @@ getBillingPortal(): Promise<never>
 getSubscription(): Promise<Subscription | null>
 ```
 
-- Returns the user's active subscription row from `subscriptions` table, or `null`.
+- Returns the user's most recent non-terminal subscription row from `subscriptions` table, or `null`.
+- Filters out `canceled` and `incomplete_expired` rows. Returns the row with the latest `current_period_end`.
 - Safe to call for anonymous users — returns `null`.
 - Does NOT throw. Always use null-check on the result.
 
@@ -58,7 +59,8 @@ getSubscription(): Promise<Subscription | null>
 requireActiveSubscription(): Promise<void>
 ```
 
-- Redirects to `/pricing` if the user has no active subscription.
+- Redirects to `/pricing` if the user has no active or trialing subscription.
+- Accepts `status = 'active'` or `status = 'trialing'` — users in a free trial are allowed through.
 - Safe for anonymous users — they get redirected to `/pricing`.
 
 ### `cancelSubscription(immediately?)`
@@ -89,7 +91,6 @@ changeSubscription(
 - `prorationBehavior` defaults to `'create_prorations'` (credit/charge deferred to next invoice).
 - Does NOT redirect. Returns `Promise<void>` — call from a Server Action wrapper.
 - The DB is updated automatically when Stripe fires `customer.subscription.updated`.
-- Use at the top of any page that requires an active subscription.
 
 ---
 
@@ -163,6 +164,42 @@ SLACK_WEBHOOK_URL   # optional
 - **Calling `req.json()` in a webhook handler** — breaks Stripe signature verification. This package uses `req.text()` correctly.
 - **Showing subscription/portal buttons to anonymous users without a guard** — they throw on submit. Check session before rendering.
 - **Forgetting `STRIPE_WEBHOOK_SECRET`** — the webhook handler returns `400 Invalid signature` for every event without it.
+
+---
+
+## Testing helpers
+
+```ts
+import { buildWebhookRequest, stripeFixtures } from '@liveedevteam/stripe/testing'
+```
+
+- `buildWebhookRequest(eventType, object, options?)` — builds a signed `Request` with correct `stripe-signature` header. Pass directly to your route handler in tests.
+- `stripeFixtures` — pre-built event objects in the `2026-05-27.dahlia` API shape:
+  - `stripeFixtures.checkoutSessionCompleted(opts?)` — `checkout.session.completed`
+  - `stripeFixtures.subscription(opts?)` — `customer.subscription.created/updated/deleted` (periods on `items.data[0]`)
+  - `stripeFixtures.invoice(opts?)` — `invoice.paid/payment_failed` (subscription ID at `parent.subscription_details.subscription`)
+
+```ts
+// Example: unit-test your webhook route
+const req = buildWebhookRequest(
+  'checkout.session.completed',
+  stripeFixtures.checkoutSessionCompleted({ mode: 'subscription', userId: 'user-1' }),
+  { secret: process.env.STRIPE_WEBHOOK_SECRET! }
+)
+const res = await POST(req)
+expect(res.status).toBe(200)
+```
+
+---
+
+## Backfill script
+
+```bash
+node node_modules/@liveedevteam/stripe/dist/scripts/backfill.js
+```
+
+- Syncs existing Stripe customers into the `stripe_customers` table by looking them up in Stripe by email. **Does not create new customers** — only records users who already exist in Stripe.
+- Run against staging first. Throttled to one user per 200 ms to avoid Stripe rate limits.
 
 ---
 
