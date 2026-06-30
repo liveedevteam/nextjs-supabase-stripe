@@ -2,6 +2,135 @@
 
 Stripe integration module for **Next.js App Router + Supabase** — one-time payments, subscriptions, webhooks, and server actions.
 
+[![npm version](https://img.shields.io/npm/v/@liveedevteam/stripe)](https://www.npmjs.com/package/@liveedevteam/stripe)
+[![CI](https://github.com/liveedevteam/nextjs-supabase-stripe/actions/workflows/ci.yml/badge.svg)](https://github.com/liveedevteam/nextjs-supabase-stripe/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
+---
+
+## Getting started
+
+Add Stripe payments to your Next.js + Supabase app in under 5 minutes.
+
+### 1. Install
+
+```bash
+pnpm add @liveedevteam/stripe stripe @supabase/ssr
+```
+
+### 2. Add env vars
+
+```bash
+# .env.local
+STRIPE_SECRET_KEY=sk_test_xxx
+STRIPE_WEBHOOK_SECRET=whsec_xxx
+NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_test_xxx
+NEXT_PUBLIC_APP_URL=http://localhost:3000
+NEXT_PUBLIC_SUPABASE_URL=https://xxx.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=xxx
+SUPABASE_SERVICE_ROLE_KEY=xxx
+```
+
+### 3. Run the database migration
+
+```bash
+supabase migration new create_stripe_tables
+supabase db push
+```
+
+<details>
+<summary>SQL to paste into the migration file</summary>
+
+```sql
+create table stripe_customers (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid references auth.users(id) not null,
+  stripe_customer_id text unique not null,
+  created_at timestamptz default now()
+);
+
+create table subscriptions (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid references auth.users(id) not null,
+  stripe_subscription_id text unique not null,
+  stripe_price_id text not null,
+  status text not null,
+  current_period_start timestamptz,
+  current_period_end timestamptz,
+  cancel_at_period_end boolean default false,
+  cancel_at timestamptz,
+  created_at timestamptz default now()
+);
+
+create table orders (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid references auth.users(id),
+  stripe_session_id text unique not null,
+  amount integer not null,
+  currency text not null,
+  status text not null,
+  created_at timestamptz default now()
+);
+
+create table webhook_events (
+  id text primary key,
+  type text not null,
+  processed_at timestamptz default now()
+);
+
+alter table stripe_customers enable row level security;
+alter table subscriptions enable row level security;
+alter table orders enable row level security;
+alter table webhook_events enable row level security;
+
+create policy "users_read_own_stripe_customer" on stripe_customers
+  for select to authenticated using (auth.uid() = user_id);
+
+create policy "users_read_own_subscriptions" on subscriptions
+  for select to authenticated using (auth.uid() = user_id);
+
+create policy "users_read_own_orders" on orders
+  for select to authenticated using (auth.uid() = user_id);
+```
+
+</details>
+
+### 4. Mount the webhook route
+
+```ts
+// app/api/webhooks/stripe/route.ts
+import { createWebhookHandler } from '@liveedevteam/stripe/webhooks'
+
+export const POST = createWebhookHandler()
+```
+
+### 5. Add a checkout button
+
+```tsx
+// components/checkout-button.tsx
+'use client'
+import { createCheckout } from '@liveedevteam/stripe/actions'
+
+export const CheckoutButton = ({ priceId }: { priceId: string }) => (
+  <form action={() => createCheckout(priceId, 'subscription')}>
+    <button type="submit">Subscribe</button>
+  </form>
+)
+```
+
+### 6. Test it locally
+
+```bash
+stripe listen --forward-to localhost:3000/api/webhooks/stripe
+stripe trigger checkout.session.completed
+```
+
+That's it. Payments, webhooks, and database sync are all wired up.
+
+> **Using Claude Code?** Skip all of the above — just type `set up stripe` and Claude handles every step automatically. [See the Claude Code skill ↓](#claude-code-setup-skill)
+
+---
+
 ## Claude Code setup skill
 
 This package ships a **Claude Code skill** that automates the full integration — migration, webhook route, env vars, and more. No copy-pasting required.
@@ -67,83 +196,6 @@ Claude: Running preflight checks...
 
 ```bash
 pnpm add @liveedevteam/stripe stripe @supabase/ssr
-```
-
-## Environment variables
-
-```bash
-STRIPE_SECRET_KEY=sk_test_xxx
-STRIPE_WEBHOOK_SECRET=whsec_xxx
-NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_test_xxx
-NEXT_PUBLIC_APP_URL=http://localhost:3000
-NEXT_PUBLIC_SUPABASE_URL=https://xxx.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=xxx
-SUPABASE_SERVICE_ROLE_KEY=xxx
-```
-
-## Database migration
-
-```bash
-supabase migration new create_stripe_tables
-```
-
-Paste into the generated file:
-
-```sql
-create table stripe_customers (
-  id uuid primary key default gen_random_uuid(),
-  user_id uuid references auth.users(id) not null,
-  stripe_customer_id text unique not null,
-  created_at timestamptz default now()
-);
-
-create table subscriptions (
-  id uuid primary key default gen_random_uuid(),
-  user_id uuid references auth.users(id) not null,
-  stripe_subscription_id text unique not null,
-  stripe_price_id text not null,
-  status text not null,
-  current_period_start timestamptz,
-  current_period_end timestamptz,
-  cancel_at_period_end boolean default false,
-  cancel_at timestamptz,
-  created_at timestamptz default now()
-);
-
-create table orders (
-  id uuid primary key default gen_random_uuid(),
-  user_id uuid references auth.users(id), -- nullable for anonymous payments
-  stripe_session_id text unique not null,
-  amount integer not null,
-  currency text not null,
-  status text not null,
-  created_at timestamptz default now()
-);
-
-create table webhook_events (
-  id text primary key,
-  type text not null,
-  processed_at timestamptz default now()
-);
-
--- Row Level Security
-alter table stripe_customers enable row level security;
-alter table subscriptions enable row level security;
-alter table orders enable row level security;
-alter table webhook_events enable row level security;
-
-create policy "users_read_own_stripe_customer" on stripe_customers
-  for select to authenticated using (auth.uid() = user_id);
-
-create policy "users_read_own_subscriptions" on subscriptions
-  for select to authenticated using (auth.uid() = user_id);
-
-create policy "users_read_own_orders" on orders
-  for select to authenticated using (auth.uid() = user_id);
-```
-
-```bash
-supabase db push
 ```
 
 ## Webhook route
@@ -266,13 +318,6 @@ import type { Subscription, Database } from '@liveedevteam/stripe/types'
 | `requireActiveSubscription()` | Redirects to `/pricing` |
 | `cancelSubscription()` | Throws `Unauthorized` |
 | `changeSubscription(priceId)` | Throws `Unauthorized` |
-
-## Local testing
-
-```bash
-stripe listen --forward-to localhost:3000/api/webhooks/stripe
-stripe trigger checkout.session.completed
-```
 
 ## Testing
 
