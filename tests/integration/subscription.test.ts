@@ -83,8 +83,8 @@ describe.skipIf(skipIfNotLocal)('subscription lifecycle handlers', () => {
       .select('current_period_start, current_period_end')
       .eq('stripe_subscription_id', subId)
       .single()
-    expect(data!.current_period_start).toBe(new Date(periodStart * 1000).toISOString())
-    expect(data!.current_period_end).toBe(new Date(periodEnd * 1000).toISOString())
+    expect(new Date(data!.current_period_start!).toISOString()).toBe(new Date(periodStart * 1000).toISOString())
+    expect(new Date(data!.current_period_end!).toISOString()).toBe(new Date(periodEnd * 1000).toISOString())
   })
 
   // ─── customer.subscription.updated ─────────────────────────────────────────
@@ -177,8 +177,8 @@ describe.skipIf(skipIfNotLocal)('subscription lifecycle handlers', () => {
       .eq('stripe_subscription_id', subId)
       .single()
     expect(after?.status).toBe('active')
-    expect(after?.current_period_start).toBe(new Date(newPeriodStart * 1000).toISOString())
-    expect(after?.current_period_end).toBe(new Date(newPeriodEnd * 1000).toISOString())
+    expect(new Date(after!.current_period_start!).toISOString()).toBe(new Date(newPeriodStart * 1000).toISOString())
+    expect(new Date(after!.current_period_end!).toISOString()).toBe(new Date(newPeriodEnd * 1000).toISOString())
   })
 
   // ─── invoice.payment_failed ─────────────────────────────────────────────────
