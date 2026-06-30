@@ -54,10 +54,9 @@ jobs:
 
       - name: Capture Supabase credentials
         run: |
-          SUPA_SERVICE_KEY=$(supabase status | grep 'service_role key' | awk '{print $NF}')
-          SUPA_DB_URL=$(supabase status | grep 'DB URL' | awk '{print $NF}')
-          echo "SUPABASE_SERVICE_ROLE_KEY=${SUPA_SERVICE_KEY}" >> $GITHUB_ENV
-          echo "SUPA_DB_URL=${SUPA_DB_URL}" >> $GITHUB_ENV
+          eval "$(supabase status --output env)"
+          echo "SUPABASE_SERVICE_ROLE_KEY=${SERVICE_ROLE_KEY}" >> $GITHUB_ENV
+          echo "SUPA_DB_URL=${DB_URL}" >> $GITHUB_ENV
 
       - name: Apply integration test schema
         run: psql "$SUPA_DB_URL" < tests/integration/schema.sql
