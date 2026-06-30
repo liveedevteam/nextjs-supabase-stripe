@@ -131,6 +131,96 @@ That's it. Payments, webhooks, and database sync are all wired up.
 
 ---
 
+## Demo app
+
+A working demo lives in [`/demo`](./demo) — a minimal Next.js + Supabase SaaS with a pricing page, Stripe Checkout, a protected dashboard, and subscription management.
+
+**The entire demo was built using this package and Claude Code.** Here's exactly how:
+
+### Setup — `set up stripe`
+
+After scaffolding a blank Next.js + Supabase project, the Claude Code skill that ships inside this package was invoked with a single command:
+
+```
+set up stripe
+```
+
+Claude ran preflight checks, created the Supabase migration, wrote the webhook route, and added all required env vars to `.env.local` — no copy-pasting required.
+
+### Pricing page — `createCheckout`
+
+Each plan card has a checkout button that calls `createCheckout` as a server action. Clicking it redirects directly to Stripe Checkout with the correct price ID and user metadata attached:
+
+```tsx
+// demo/app/pricing/checkout-button.tsx
+'use client'
+import { createCheckout } from '@liveedevteam/stripe/actions'
+
+export default function CheckoutButton({ priceId }: { priceId: string }) {
+  return (
+    <form action={() => createCheckout(priceId, 'subscription')}>
+      <button type="submit">Get started</button>
+    </form>
+  )
+}
+```
+
+### Dashboard — `requireActiveSubscription` + `getSubscription`
+
+The dashboard is a server component. Two lines handle auth and data — no middleware, no custom guards:
+
+```ts
+// demo/app/dashboard/page.tsx
+await requireActiveSubscription() // redirects to /pricing if no active sub
+const sub = await getSubscription() // typed subscription row from DB
+```
+
+The page renders the plan status, current period end, and cancel state directly from the `sub` object.
+
+### Billing portal — `getBillingPortal`
+
+A single server action wires up the "Manage billing" button. Stripe handles the rest:
+
+```tsx
+// demo/app/dashboard/portal-button.tsx
+import { getBillingPortal } from '@liveedevteam/stripe/actions'
+
+export default function PortalButton() {
+  return (
+    <form action={getBillingPortal}>
+      <button type="submit">Manage billing</button>
+    </form>
+  )
+}
+```
+
+### Cancel — `cancelSubscription`
+
+The cancel button calls `cancelSubscription()` which sets `cancel_at_period_end: true` on the Stripe subscription. The DB is updated automatically when Stripe fires `customer.subscription.updated` — no extra code needed:
+
+```ts
+import { cancelSubscription } from '@liveedevteam/stripe/actions'
+await cancelSubscription() // soft cancel — access until period end
+```
+
+### Webhooks — `createWebhookHandler`
+
+The webhook route is one line. Signature verification, idempotency, and all event handlers are built in:
+
+```ts
+// demo/app/api/webhooks/stripe/route.ts
+import { createWebhookHandler } from '@liveedevteam/stripe/webhooks'
+export const POST = createWebhookHandler()
+```
+
+### Result
+
+The complete demo — 7 routes, auth, checkout, dashboard, and webhooks — was built in a single session with Claude Code. The package handled every Stripe interaction; the demo only needed to build the UI around it.
+
+→ **[View the demo source](./demo)**
+
+---
+
 ## Claude Code setup skill
 
 This package ships a **Claude Code skill** that automates the full integration — migration, webhook route, env vars, and more. No copy-pasting required.
