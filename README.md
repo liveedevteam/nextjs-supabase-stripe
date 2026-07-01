@@ -43,15 +43,14 @@ supabase db push
 
 ```sql
 create table stripe_customers (
-  id uuid primary key default gen_random_uuid(),
-  user_id uuid references auth.users(id) not null,
+  user_id uuid primary key references auth.users(id) on delete cascade,
   stripe_customer_id text unique not null,
   created_at timestamptz default now()
 );
 
 create table subscriptions (
   id uuid primary key default gen_random_uuid(),
-  user_id uuid references auth.users(id) not null,
+  user_id uuid references auth.users(id) on delete cascade not null,
   stripe_subscription_id text unique not null,
   stripe_price_id text not null,
   status text not null,
@@ -64,7 +63,7 @@ create table subscriptions (
 
 create table orders (
   id uuid primary key default gen_random_uuid(),
-  user_id uuid references auth.users(id),
+  user_id uuid references auth.users(id) on delete set null,
   stripe_session_id text unique not null,
   amount integer not null,
   currency text not null,
@@ -75,7 +74,7 @@ create table orders (
 create table webhook_events (
   id text primary key,
   type text not null,
-  processed_at timestamptz default now()
+  created_at timestamptz default now()
 );
 
 alter table stripe_customers enable row level security;
@@ -106,17 +105,43 @@ export const POST = createWebhookHandler()
 
 ### 5. Add a checkout button
 
-```tsx
-// components/checkout-button.tsx
-'use client'
-import { createCheckout } from '@liveedevteam/stripe/actions'
+Create a local `app/actions.ts` wrapper first (catches `Unauthorized` → redirect to `/login`):
 
-export const CheckoutButton = ({ priceId }: { priceId: string }) => (
-  <form action={() => createCheckout(priceId, 'subscription')}>
+```ts
+// app/actions.ts
+'use server'
+import { createCheckout as _createCheckout } from '@liveedevteam/stripe/actions'
+import { redirect } from 'next/navigation'
+
+export async function createCheckout(priceId: string, mode: 'payment' | 'subscription') {
+  try {
+    await _createCheckout(priceId, mode)
+  } catch (e: any) {
+    if (e?.digest?.startsWith('NEXT_REDIRECT')) throw e
+    if (e?.message === 'Unauthorized') redirect('/login')
+    throw e
+  }
+}
+```
+
+Then create the button as a **server component** (no `'use client'`) using `.bind()`:
+
+```tsx
+// components/checkout-button.tsx  ← no 'use client'
+import { createCheckout } from '@/app/actions'
+
+export const CheckoutButton = ({ priceId, mode }: {
+  priceId: string
+  mode: 'payment' | 'subscription'
+}) => (
+  <form action={createCheckout.bind(null, priceId, mode)}>
     <button type="submit">Subscribe</button>
   </form>
 )
 ```
+
+> **Why `.bind()` and not `() => createCheckout(...)`?**
+> Wrapping a server action in an arrow function inside a `'use client'` component loses the server action reference — the form silently does nothing. Using `.bind()` on a server component is required.
 
 ### 6. Test it locally
 
@@ -133,7 +158,9 @@ That's it. Payments, webhooks, and database sync are all wired up.
 
 ## Demo app
 
-A working demo lives in [`/demo`](./demo) — a minimal Next.js + Supabase SaaS with a pricing page, Stripe Checkout, a protected dashboard, and subscription management.
+**[→ Live demo](https://demo-one-alpha-46.vercel.app)** · [Source](./demo)
+
+A working demo — minimal Next.js + Supabase SaaS with a pricing page, Stripe Checkout, a protected dashboard, and subscription management.
 
 **The entire demo was built using this package and Claude Code.** Here's exactly how:
 
@@ -149,16 +176,32 @@ Claude ran preflight checks, created the Supabase migration, wrote the webhook r
 
 ### Pricing page — `createCheckout`
 
-Each plan card has a checkout button that calls `createCheckout` as a server action. Clicking it redirects directly to Stripe Checkout with the correct price ID and user metadata attached:
+Each plan card has a checkout button that calls `createCheckout` as a server action. Clicking it redirects directly to Stripe Checkout with the correct price ID and user metadata attached.
+
+The button is a **server component** using `.bind()` — this is required. Wrapping a server action in an arrow function inside a `'use client'` component loses the server action reference and the form silently does nothing.
 
 ```tsx
-// demo/app/pricing/checkout-button.tsx
-'use client'
-import { createCheckout } from '@liveedevteam/stripe/actions'
+// app/actions.ts — local wrapper (catches Unauthorized → redirect to /login)
+'use server'
+import { createCheckout as _createCheckout } from '@liveedevteam/stripe/actions'
+import { redirect } from 'next/navigation'
+
+export async function createCheckout(priceId: string, mode: 'payment' | 'subscription') {
+  try {
+    await _createCheckout(priceId, mode)
+  } catch (e: any) {
+    if (e?.digest?.startsWith('NEXT_REDIRECT')) throw e
+    if (e?.message === 'Unauthorized') redirect('/login')
+    throw e
+  }
+}
+
+// demo/app/pricing/checkout-button.tsx — server component, no 'use client'
+import { createCheckout } from '../actions'
 
 export default function CheckoutButton({ priceId }: { priceId: string }) {
   return (
-    <form action={() => createCheckout(priceId, 'subscription')}>
+    <form action={createCheckout.bind(null, priceId, 'subscription')}>
       <button type="submit">Get started</button>
     </form>
   )
@@ -312,15 +355,17 @@ export const POST = createWebhookHandler({
 
 ### Checkout button
 
+Use a **server component** with `.bind()` — do not use `'use client'` with an arrow function, it will silently break the form.
+
 ```tsx
-'use client'
-import { createCheckout } from '@liveedevteam/stripe/actions'
+// components/checkout-button.tsx  ← no 'use client'
+import { createCheckout } from '@/app/actions' // local wrapper, see Getting started step 5
 
 export const CheckoutButton = ({ priceId, mode }: {
   priceId: string
   mode: 'payment' | 'subscription'
 }) => (
-  <form action={() => createCheckout(priceId, mode)}>
+  <form action={createCheckout.bind(null, priceId, mode)}>
     <button type="submit">Checkout</button>
   </form>
 )
@@ -329,7 +374,7 @@ export const CheckoutButton = ({ priceId, mode }: {
 ### Billing portal
 
 ```tsx
-'use client'
+// components/billing-portal-button.tsx  ← no 'use client'
 import { getBillingPortal } from '@liveedevteam/stripe/actions'
 
 export const BillingPortalButton = () => (
