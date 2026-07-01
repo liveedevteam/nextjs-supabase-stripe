@@ -49,8 +49,8 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
-      - name: Start local Supabase and apply migrations
-        run: supabase db reset --local
+      - name: Start local Supabase
+        run: supabase start
 
       - name: Capture Supabase credentials
         run: |
