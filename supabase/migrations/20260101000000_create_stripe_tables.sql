@@ -1,13 +1,12 @@
 create table stripe_customers (
-  id uuid primary key default gen_random_uuid(),
-  user_id uuid references auth.users(id) not null,
+  user_id uuid primary key references auth.users(id) on delete cascade,
   stripe_customer_id text unique not null,
   created_at timestamptz default now()
 );
 
 create table subscriptions (
   id uuid primary key default gen_random_uuid(),
-  user_id uuid references auth.users(id) not null,
+  user_id uuid references auth.users(id) on delete cascade not null,
   stripe_subscription_id text unique not null,
   stripe_price_id text not null,
   status text not null,
@@ -20,7 +19,7 @@ create table subscriptions (
 
 create table orders (
   id uuid primary key default gen_random_uuid(),
-  user_id uuid references auth.users(id),
+  user_id uuid references auth.users(id) on delete set null,
   stripe_session_id text unique not null,
   amount integer not null,
   currency text not null,
@@ -31,7 +30,7 @@ create table orders (
 create table webhook_events (
   id text primary key,
   type text not null,
-  processed_at timestamptz default now()
+  created_at timestamptz default now()
 );
 
 -- RLS
@@ -48,3 +47,7 @@ create policy "users_read_own_subscriptions" on subscriptions
 
 create policy "users_read_own_orders" on orders
   for select to authenticated using (auth.uid() = user_id);
+
+grant all on stripe_customers, subscriptions, orders, webhook_events to service_role;
+grant all on stripe_customers, subscriptions, orders, webhook_events to anon;
+grant all on stripe_customers, subscriptions, orders, webhook_events to authenticated;

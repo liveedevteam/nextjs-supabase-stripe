@@ -49,17 +49,13 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
-      - name: Start local Supabase
-        run: supabase start
+      - name: Start local Supabase and apply migrations
+        run: supabase db reset --local
 
       - name: Capture Supabase credentials
         run: |
           eval "$(supabase status --output env)"
           echo "SUPABASE_SERVICE_ROLE_KEY=${SERVICE_ROLE_KEY}" >> $GITHUB_ENV
-          echo "SUPA_DB_URL=${DB_URL}" >> $GITHUB_ENV
-
-      - name: Apply integration test schema
-        run: psql "$SUPA_DB_URL" < tests/integration/schema.sql
 
       - name: Run integration tests
         run: pnpm test:integration
