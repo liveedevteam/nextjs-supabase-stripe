@@ -1,6 +1,4 @@
-'use client'
-
-import { createCheckout } from '@liveedevteam/stripe/actions'
+import { createCheckout } from '../actions'
 
 export default function CheckoutButton({
   priceId,
@@ -12,7 +10,7 @@ export default function CheckoutButton({
   featured?: boolean
 }) {
   return (
-    <form action={() => createCheckout(priceId, 'subscription')}>
+    <form action={createCheckout.bind(null, priceId, 'subscription')}>
       <button
         type="submit"
         className={`btn btn-full ${featured ? 'btn-primary' : 'btn-secondary'}`}

@@ -145,54 +145,128 @@ export const POST = createWebhookHandler()
 
 ---
 
-## Step 4 — Checkout Button Component
+## Step 4 — Server Actions Wrapper
 
-Check if a checkout button component already exists anywhere in `components/`.
-If not, create `components/CheckoutButton.tsx`:
+**Important:** Do NOT import server actions from `@liveedevteam/stripe/actions` directly inside
+`'use client'` components and wrap them in arrow functions — this breaks Next.js server action
+binding and the form will silently fail.
+
+Instead, create `app/actions.ts` as a local wrapper with proper error handling:
+
+```ts
+'use server'
+
+import {
+  createCheckout as _createCheckout,
+  getBillingPortal as _getBillingPortal,
+  cancelSubscription as _cancelSubscription,
+} from '@liveedevteam/stripe/actions'
+import { redirect } from 'next/navigation'
+
+function rethrowRedirect(e: unknown): never {
+  // next/navigation redirect() throws a special error — always re-throw it
+  if (
+    e instanceof Error &&
+    (e as any).digest?.startsWith('NEXT_REDIRECT')
+  ) throw e
+  throw e
+}
+
+export async function createCheckout(
+  priceId: string,
+  mode: 'payment' | 'subscription'
+) {
+  try {
+    await _createCheckout(priceId, mode)
+  } catch (e: any) {
+    rethrowRedirect(e)
+    if (e?.message === 'Unauthorized') redirect('/login')
+    throw e
+  }
+}
+
+export async function getBillingPortal() {
+  try {
+    await _getBillingPortal()
+  } catch (e: any) {
+    rethrowRedirect(e)
+    if (e?.message === 'Unauthorized') redirect('/login')
+    throw e
+  }
+}
+
+export async function cancelSubscription(immediately = false) {
+  try {
+    await _cancelSubscription(immediately)
+  } catch (e: any) {
+    rethrowRedirect(e)
+    throw e
+  }
+}
+```
+
+This wrapper:
+- Catches `Unauthorized` errors and redirects to `/login` rather than crashing
+- Re-throws Next.js redirect errors so they propagate correctly
+- Provides a single place to add logging or error tracking later
+
+---
+
+## Step 5 — Checkout Button Component
+
+Create `components/CheckoutButton.tsx`. This must be a **server component** (no `'use client'`)
+that uses `.bind()` to pass the price ID as a bound server action argument:
 
 ```tsx
-'use client'
-
-import { createCheckout } from '@liveedevteam/stripe/actions'
+import { createCheckout } from '@/app/actions'
 
 interface CheckoutButtonProps {
   priceId: string
   mode: 'payment' | 'subscription'
   label?: string
+  className?: string
 }
 
 export const CheckoutButton = ({
   priceId,
   mode,
   label = 'Checkout',
+  className,
 }: CheckoutButtonProps) => (
-  <form action={() => createCheckout(priceId, mode)}>
-    <button type="submit">{label}</button>
+  <form action={createCheckout.bind(null, priceId, mode)}>
+    <button type="submit" className={className}>
+      {label}
+    </button>
   </form>
 )
 ```
 
+**Why `.bind()` and not `() => createCheckout(...)`?**
+Wrapping a server action in an inline arrow function inside a `'use client'` component loses the
+server action reference — React can't register it and the form silently does nothing. Using
+`.bind()` on a server component creates a proper bound server action that Next.js can serialize.
+
 ---
 
-## Step 5 — Billing Portal Button Component
+## Step 6 — Billing Portal Button Component
 
-Create `components/BillingPortalButton.tsx` if it does not exist:
+Create `components/BillingPortalButton.tsx`:
 
 ```tsx
-'use client'
+import { getBillingPortal } from '@/app/actions'
 
-import { getBillingPortal } from '@liveedevteam/stripe/actions'
-
-export const BillingPortalButton = () => (
+export const BillingPortalButton = ({ className }: { className?: string }) => (
   <form action={getBillingPortal}>
-    <button type="submit">Manage Subscription</button>
+    <button type="submit" className={className}>
+      Manage Subscription
+    </button>
   </form>
 )
 ```
 
 ---
 
-## Step 6 — Environment Variables
+## Step 7 — Environment Variables
 
 Read the current `.env.local`. If it does not exist, create it.
 
@@ -203,6 +277,9 @@ Add any of the following that are missing — use placeholder values:
 STRIPE_SECRET_KEY=sk_test_REPLACE_ME
 STRIPE_WEBHOOK_SECRET=whsec_REPLACE_ME
 NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_test_REPLACE_ME
+
+# Must be the full production URL with no trailing slash, e.g. https://yourapp.vercel.app
+# Used as the base for Stripe success_url and cancel_url — an invalid URL will cause checkout to fail
 NEXT_PUBLIC_APP_URL=http://localhost:3000
 ```
 
@@ -210,9 +287,26 @@ Do NOT overwrite any values that already exist.
 
 After writing, clearly list which env vars were added and remind the engineer to replace placeholder values before testing.
 
+### ⚠️ Vercel env var warning
+
+When adding env vars to Vercel via the CLI, always use `printf` (not `echo`) to avoid a trailing
+newline being stored as part of the value. A newline in `STRIPE_SECRET_KEY` causes
+`Invalid character in header` errors; a newline in `NEXT_PUBLIC_APP_URL` makes Stripe reject
+`success_url` with `url_invalid`.
+
+**Correct:**
+```bash
+printf "sk_test_..." | vercel env add STRIPE_SECRET_KEY production
+```
+
+**Wrong — adds a trailing newline:**
+```bash
+echo "sk_test_..." | vercel env add STRIPE_SECRET_KEY production
+```
+
 ---
 
-## Step 7 — Slack Notifications (Optional)
+## Step 8 — Slack Notifications (Optional)
 
 Ask the engineer:
 
@@ -260,7 +354,7 @@ No further action needed. Slack can always be added later.
 
 ---
 
-## Step 8 — Backfill Check (Existing Projects Only)
+## Step 9 — Backfill Check (Existing Projects Only)
 
 If this is an **existing project** (had `supabase/migrations/` before this skill ran):
 
@@ -273,19 +367,20 @@ If this is an **existing project** (had `supabase/migrations/` before this skill
 This project has existing auth users who do not have a Stripe customer ID.
 Before going live, run the backfill script:
 
-  npx ts-node node_modules/@liveedevteam/stripe/scripts/backfill.ts
+  node node_modules/@liveedevteam/stripe/dist/scripts/backfill.js
 
 Always run this against staging first. Never run directly on production without testing.
 ```
 
 ---
 
-## Step 9 — Verify Setup
+## Step 10 — Verify Setup
 
 After all steps, verify the following files exist:
 
 - [ ] `supabase/migrations/<timestamp>_create_stripe_tables.sql`
 - [ ] `app/api/webhooks/stripe/route.ts`
+- [ ] `app/actions.ts` (local server action wrapper)
 - [ ] `components/CheckoutButton.tsx`
 - [ ] `components/BillingPortalButton.tsx`
 - [ ] `.env.local` contains all 4 required Stripe env vars
@@ -295,7 +390,7 @@ If any are missing, create them now before showing the summary.
 
 ---
 
-## Step 10 — Final Summary
+## Step 11 — Final Summary
 
 Print a clear summary when done:
 
@@ -305,6 +400,7 @@ Print a clear summary when done:
 Files created:
   supabase/migrations/<timestamp>_create_stripe_tables.sql
   app/api/webhooks/stripe/route.ts
+  app/actions.ts
   components/CheckoutButton.tsx
   components/BillingPortalButton.tsx
 
@@ -312,7 +408,7 @@ Env vars added to .env.local:
   STRIPE_SECRET_KEY (replace with real value)
   STRIPE_WEBHOOK_SECRET (replace with real value)
   NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY (replace with real value)
-  NEXT_PUBLIC_APP_URL (set to http://localhost:3000)
+  NEXT_PUBLIC_APP_URL (set to http://localhost:3000 — update to your production URL before deploying)
 
 Next steps:
   1. Fill in real Stripe API keys in .env.local
@@ -338,6 +434,9 @@ Next steps:
        <CheckoutButton priceId="price_xxx" mode="subscription" />
      — One-time payment (anonymous allowed):
        <CheckoutButton priceId="price_xxx" mode="payment" />
+
+  6. Before deploying to Vercel, update NEXT_PUBLIC_APP_URL to your production URL.
+     When setting env vars via Vercel CLI, use printf not echo to avoid trailing newlines.
 ```
 
 ---
@@ -349,3 +448,16 @@ Next steps:
 - If `supabase db push` fails, the engineer must fix it before continuing — do not proceed without a working schema
 - If env vars are missing and cannot be added (e.g. `.env.local` is gitignored with no write access), warn clearly and show the values to add manually
 - If the project uses `npm` or `yarn` instead of `pnpm`, use the correct package manager detected from `package-lock.json` or `yarn.lock`
+
+---
+
+## Known Pitfalls (from real-world usage)
+
+| Symptom | Root cause | Fix |
+|---|---|---|
+| Form does nothing when submitted | `'use client'` component wraps server action in `() => fn()` arrow — not a valid server action reference | Use `.bind()` on a server component or `app/actions.ts` wrapper |
+| `Invalid character in header ["Authorization"]` | `STRIPE_SECRET_KEY` has a trailing newline from `echo \| vercel env add` | Re-add with `printf` |
+| Stripe rejects `success_url` with `url_invalid` | `NEXT_PUBLIC_APP_URL` has trailing `\n` or wrong value | Re-add with `printf`, verify no trailing slash or newline |
+| `Unauthorized` error on checkout click | User not logged in; package throws instead of redirecting | `app/actions.ts` wrapper catches this and redirects to `/login` |
+| `Module not found: @liveedevteam/stripe` on Vercel | Demo uses `"file:.."` local path; Vercel only uploads the subdirectory | Change to published npm version `"^x.x.x"` in `package.json` |
+| `NEXT_REDIRECT` swallowed / no navigation | `try/catch` catches Next.js redirect error without re-throwing | Always check `e.digest?.startsWith('NEXT_REDIRECT')` and re-throw |
