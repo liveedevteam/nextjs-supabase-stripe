@@ -74,9 +74,9 @@ export async function seedSubscription(params: {
 }
 
 // ─── Cleanup helpers ──────────────────────────────────────────────────────────
-// ON DELETE CASCADE in schema.sql means deleting from auth.users also removes
-// stripe_customers and subscriptions. Orders need manual cleanup because
-// user_id FK is ON DELETE SET NULL (nullable anonymous payments would persist).
+// ON DELETE CASCADE in the migration means deleting from auth.users also
+// removes stripe_customers and subscriptions. Orders need manual cleanup
+// because user_id FK is ON DELETE SET NULL (nullable anonymous payments would persist).
 
 export async function cleanupUser(userId: string): Promise<void> {
   await db().from('orders').delete().eq('user_id', userId)

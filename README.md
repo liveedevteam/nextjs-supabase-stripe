@@ -281,7 +281,7 @@ Claude detects what's already in place and walks through every step automaticall
 **What the skill does:**
 
 1. Checks for missing dependencies and installs them
-2. Creates the Supabase migration (`stripe_customers`, `subscriptions`, `orders`, `products`, `prices`, `webhook_events`) and applies it
+2. Creates the Supabase migration (`stripe_customers`, `subscriptions`, `orders`, `webhook_events`) and applies it
 3. Creates `app/api/webhooks/stripe/route.ts` with signature verification and idempotency
 4. Scaffolds a `CheckoutButton` component (and billing portal button if subscriptions are enabled)
 5. Adds all required env vars to `.env.local` (with placeholder values to fill in)

@@ -95,7 +95,10 @@ export async function getSubscription(): Promise<Subscription | null> {
     .limit(1)
     .maybeSingle()
 
-  return data
+  // `status` is `text` in Postgres (no CHECK constraint), so the generated
+  // Database type is honestly just `string`. This package's webhook handler
+  // is the only writer and only ever writes SubscriptionStatus values.
+  return data as Subscription | null
 }
 
 export async function cancelSubscription(immediately = false): Promise<void> {
