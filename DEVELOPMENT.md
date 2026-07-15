@@ -88,60 +88,13 @@ supabase init
 supabase migration new create_stripe_tables
 ```
 
-This creates `supabase/migrations/<timestamp>_create_stripe_tables.sql`. Paste the following SQL into it:
+This creates `supabase/migrations/<timestamp>_create_stripe_tables.sql`.
 
-```sql
-create table stripe_customers (
-  id uuid primary key default gen_random_uuid(),
-  user_id uuid references auth.users(id) not null,
-  stripe_customer_id text unique not null,
-  created_at timestamptz default now()
-);
-
-create table subscriptions (
-  id uuid primary key default gen_random_uuid(),
-  user_id uuid references auth.users(id) not null,
-  stripe_subscription_id text unique not null,
-  stripe_price_id text not null,
-  status text not null,
-  current_period_start timestamptz,
-  current_period_end timestamptz,
-  cancel_at_period_end boolean default false,
-  created_at timestamptz default now()
-);
-
-create table orders (
-  id uuid primary key default gen_random_uuid(),
-  user_id uuid references auth.users(id), -- nullable: anonymous one-time payments have no user
-  stripe_session_id text unique not null,
-  amount integer not null,
-  currency text not null,
-  status text not null,
-  created_at timestamptz default now()
-);
-
-create table products (
-  id text primary key,
-  name text not null,
-  description text,
-  active boolean default true
-);
-
-create table prices (
-  id text primary key,
-  product_id text references products(id) not null,
-  unit_amount integer,
-  currency text not null,
-  interval text,
-  active boolean default true
-);
-
-create table webhook_events (
-  id text primary key,
-  type text not null,
-  processed_at timestamptz default now()
-);
-```
+The canonical schema lives in `supabase/migrations/20260101000000_create_stripe_tables.sql` in this
+repo — that file is the single source of truth for `stripe_customers`, `subscriptions`, `orders`, and
+`webhook_events` (there are no `products`/`prices` tables; pricing is looked up from Stripe directly).
+Do not hand-copy the SQL here — it will drift. `src/database.types.ts` is generated from this migration
+and CI fails if they diverge (see `.github/workflows/ci.yml`).
 
 #### Apply migrations
 
@@ -523,7 +476,7 @@ Anonymous one-time payment orders are recorded in `orders` with `user_id = null`
 1. **Not wrapping `handleEvent` in try/catch** — without it, a failed event returns 500 silently and Stripe keeps retrying. The try/catch is what enables Slack notifications and clean error responses.
 2. **Using `req.json()` in webhook handler** — breaks Stripe signature verification. Always use `req.text()`.
 2. **Skipping idempotency** — Stripe retries webhooks. Without the `webhook_events` check, subscriptions can activate twice.
-3. **Hardcoding price IDs on the frontend** — query the `prices` table from Supabase instead.
+3. **Hardcoding Stripe price IDs in component code** — there is no `prices` table in this package's schema (price lookups happen directly against Stripe); keep price IDs in env vars or a config module so they can differ per environment.
 4. **Not running backfill in staging first** — always validate backfill against a staging DB before production.
 5. **Using service-role key to identify the current user** — `supabase.auth.getUser()` on a service-role client has no session and always returns null. Use `@supabase/ssr` `createServerClient` with `cookies()` in server actions. The service-role client is correct for the webhook handler and DB writes that bypass RLS.
 6. **Rendering checkout/portal buttons for anonymous users without a guard** — `createCheckout('subscription')` and `getBillingPortal` throw for anonymous users. Wrap them in a session check or only render them on authenticated pages.

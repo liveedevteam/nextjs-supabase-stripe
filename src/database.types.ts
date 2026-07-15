@@ -1,138 +1,266 @@
-type SubscriptionStatus =
-  | 'active'
-  | 'canceled'
-  | 'incomplete'
-  | 'incomplete_expired'
-  | 'past_due'
-  | 'trialing'
-  | 'unpaid'
-  | 'paused'
+// GENERATED FILE — do not hand-edit.
+//
+// Produced by: supabase gen types typescript --local --schema public
+// Source of truth: supabase/migrations/ — CI regenerates this file against a
+// freshly-migrated local stack and fails the build if it differs (see
+// .github/workflows/ci.yml). To update after a migration change, run:
+//   supabase start && supabase gen types typescript --local --schema public > src/database.types.ts
+//
+// Hand-authored helper types (Subscription, SubscriptionStatus, etc.) that
+// build on top of this file live in src/types.ts instead.
 
-/**
- * Database schema for the tables owned by this package.
- *
- * Pass this to createClient<Database>() in your Supabase client to get
- * type-checked queries for the billing tables. If you have other tables,
- * merge this with your own generated types:
- *
- * @example
- * import type { Database as BillingDB } from 'nextjs-supabase-stripe/types'
- * type Database = BillingDB & { public: { Tables: { ...yourTables } } }
- */
+export type Json =
+  | string
+  | number
+  | boolean
+  | null
+  | { [key: string]: Json | undefined }
+  | Json[]
+
 export type Database = {
   public: {
     Tables: {
       orders: {
         Row: {
-          id: string
-          user_id: string | null
-          stripe_session_id: string
           amount: number
+          created_at: string | null
           currency: string
+          id: string
           status: string
-          created_at: string
+          stripe_session_id: string
+          user_id: string | null
         }
         Insert: {
-          id?: string
-          user_id?: string | null
-          stripe_session_id: string
           amount: number
-          currency?: string
-          status?: string
-          created_at?: string
+          created_at?: string | null
+          currency: string
+          id?: string
+          status: string
+          stripe_session_id: string
+          user_id?: string | null
         }
         Update: {
-          id?: string
-          user_id?: string | null
-          stripe_session_id?: string
           amount?: number
+          created_at?: string | null
           currency?: string
+          id?: string
           status?: string
-          created_at?: string
+          stripe_session_id?: string
+          user_id?: string | null
         }
         Relationships: []
       }
       stripe_customers: {
         Row: {
-          user_id: string
+          created_at: string | null
           stripe_customer_id: string
-          created_at: string
+          user_id: string
         }
         Insert: {
-          user_id: string
+          created_at?: string | null
           stripe_customer_id: string
-          created_at?: string
+          user_id: string
         }
         Update: {
-          user_id?: string
+          created_at?: string | null
           stripe_customer_id?: string
-          created_at?: string
+          user_id?: string
         }
         Relationships: []
       }
       subscriptions: {
         Row: {
-          id: string
-          user_id: string
-          stripe_subscription_id: string
-          stripe_price_id: string
-          status: SubscriptionStatus
-          current_period_start: string
-          current_period_end: string
-          cancel_at_period_end: boolean
           cancel_at: string | null
-          created_at: string
+          cancel_at_period_end: boolean | null
+          created_at: string | null
+          current_period_end: string | null
+          current_period_start: string | null
+          id: string
+          status: string
+          stripe_price_id: string
+          stripe_subscription_id: string
+          user_id: string
         }
         Insert: {
-          id?: string
-          user_id: string
-          stripe_subscription_id: string
-          stripe_price_id: string
-          status: SubscriptionStatus
-          current_period_start: string
-          current_period_end: string
-          cancel_at_period_end?: boolean
           cancel_at?: string | null
-          created_at?: string
+          cancel_at_period_end?: boolean | null
+          created_at?: string | null
+          current_period_end?: string | null
+          current_period_start?: string | null
+          id?: string
+          status: string
+          stripe_price_id: string
+          stripe_subscription_id: string
+          user_id: string
         }
         Update: {
-          id?: string
-          user_id?: string
-          stripe_subscription_id?: string
-          stripe_price_id?: string
-          status?: SubscriptionStatus
-          current_period_start?: string
-          current_period_end?: string
-          cancel_at_period_end?: boolean
           cancel_at?: string | null
-          created_at?: string
+          cancel_at_period_end?: boolean | null
+          created_at?: string | null
+          current_period_end?: string | null
+          current_period_start?: string | null
+          id?: string
+          status?: string
+          stripe_price_id?: string
+          stripe_subscription_id?: string
+          user_id?: string
         }
         Relationships: []
       }
       webhook_events: {
         Row: {
+          created_at: string | null
           id: string
           type: string
-          created_at: string
         }
         Insert: {
+          created_at?: string | null
           id: string
           type: string
-          created_at?: string
         }
         Update: {
+          created_at?: string | null
           id?: string
           type?: string
-          created_at?: string
         }
         Relationships: []
       }
     }
-    // Use empty mapped type so Supabase's GenericSchema constraint is satisfied
-    // without a string index signature that would poison column type lookups
-    Views: { [_ in never]: never }
-    Functions: { [_ in never]: never }
-    Enums: { [_ in never]: never }
-    CompositeTypes: { [_ in never]: never }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      [_ in never]: never
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
   }
 }
+
+type DatabaseWithoutInternals = Omit<Database, "__InternalSupabase">
+
+type DefaultSchema = DatabaseWithoutInternals[Extract<keyof Database, "public">]
+
+export type Tables<
+  DefaultSchemaTableNameOrOptions extends
+    | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends DefaultSchemaTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
+        DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
+    : never = never,
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
+      DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])[TableName] extends {
+      Row: infer R
+    }
+    ? R
+    : never
+  : DefaultSchemaTableNameOrOptions extends keyof (DefaultSchema["Tables"] &
+        DefaultSchema["Views"])
+    ? (DefaultSchema["Tables"] &
+        DefaultSchema["Views"])[DefaultSchemaTableNameOrOptions] extends {
+        Row: infer R
+      }
+      ? R
+      : never
+    : never
+
+export type TablesInsert<
+  DefaultSchemaTableNameOrOptions extends
+    | keyof DefaultSchema["Tables"]
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends DefaultSchemaTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+    : never = never,
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
+      Insert: infer I
+    }
+    ? I
+    : never
+  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
+    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
+        Insert: infer I
+      }
+      ? I
+      : never
+    : never
+
+export type TablesUpdate<
+  DefaultSchemaTableNameOrOptions extends
+    | keyof DefaultSchema["Tables"]
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends DefaultSchemaTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+    : never = never,
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
+      Update: infer U
+    }
+    ? U
+    : never
+  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
+    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
+        Update: infer U
+      }
+      ? U
+      : never
+    : never
+
+export type Enums<
+  DefaultSchemaEnumNameOrOptions extends
+    | keyof DefaultSchema["Enums"]
+    | { schema: keyof DatabaseWithoutInternals },
+  EnumName extends DefaultSchemaEnumNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
+    : never = never,
+> = DefaultSchemaEnumNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"][EnumName]
+  : DefaultSchemaEnumNameOrOptions extends keyof DefaultSchema["Enums"]
+    ? DefaultSchema["Enums"][DefaultSchemaEnumNameOrOptions]
+    : never
+
+export type CompositeTypes<
+  PublicCompositeTypeNameOrOptions extends
+    | keyof DefaultSchema["CompositeTypes"]
+    | { schema: keyof DatabaseWithoutInternals },
+  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
+    : never = never,
+> = PublicCompositeTypeNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
+  : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema["CompositeTypes"]
+    ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
+    : never
+
+export const Constants = {
+  public: {
+    Enums: {},
+  },
+} as const
+

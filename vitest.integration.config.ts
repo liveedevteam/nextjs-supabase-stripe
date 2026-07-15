@@ -1,7 +1,9 @@
 import { defineConfig } from 'vitest/config'
 
 // Run with: pnpm test:integration
-// Requires local Supabase (supabase start) with schema applied (supabase db reset --db-url <url> < tests/integration/schema.sql)
+// Requires local Supabase: `supabase start` (or `supabase db reset` on an
+// already-running stack) applies supabase/migrations/ automatically — that
+// migration is the only schema source of truth, there is no separate test schema.
 // Set in environment before running:
 //   NEXT_PUBLIC_SUPABASE_URL=http://localhost:54321
 //   SUPABASE_SERVICE_ROLE_KEY=<from supabase start output>

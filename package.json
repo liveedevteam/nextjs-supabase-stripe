@@ -27,6 +27,7 @@
   },
   "files": [
     "dist",
+    "supabase/migrations",
     "README.md",
     "LICENSE",
     "CLAUDE.md",
