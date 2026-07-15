@@ -105,12 +105,12 @@ export const POST = createWebhookHandler()
 
 ### 5. Add a checkout button
 
-Create a local `app/actions.ts` wrapper first (catches `Unauthorized` → redirect to `/login`):
+Create a local `app/actions.ts` wrapper first (catches `UnauthorizedError` → redirect to `/login`):
 
 ```ts
 // app/actions.ts
 'use server'
-import { createCheckout as _createCheckout } from 'nextjs-supabase-stripe/actions'
+import { createCheckout as _createCheckout, UnauthorizedError } from 'nextjs-supabase-stripe/actions'
 import { redirect } from 'next/navigation'
 
 export async function createCheckout(priceId: string, mode: 'payment' | 'subscription') {
@@ -118,7 +118,7 @@ export async function createCheckout(priceId: string, mode: 'payment' | 'subscri
     await _createCheckout(priceId, mode)
   } catch (e: any) {
     if (e?.digest?.startsWith('NEXT_REDIRECT')) throw e
-    if (e?.message === 'Unauthorized') redirect('/login')
+    if (e instanceof UnauthorizedError) redirect('/login')
     throw e
   }
 }
@@ -181,9 +181,9 @@ Each plan card has a checkout button that calls `createCheckout` as a server act
 The button is a **server component** using `.bind()` — this is required. Wrapping a server action in an arrow function inside a `'use client'` component loses the server action reference and the form silently does nothing.
 
 ```tsx
-// app/actions.ts — local wrapper (catches Unauthorized → redirect to /login)
+// app/actions.ts — local wrapper (catches UnauthorizedError → redirect to /login)
 'use server'
-import { createCheckout as _createCheckout } from 'nextjs-supabase-stripe/actions'
+import { createCheckout as _createCheckout, UnauthorizedError } from 'nextjs-supabase-stripe/actions'
 import { redirect } from 'next/navigation'
 
 export async function createCheckout(priceId: string, mode: 'payment' | 'subscription') {
@@ -191,7 +191,7 @@ export async function createCheckout(priceId: string, mode: 'payment' | 'subscri
     await _createCheckout(priceId, mode)
   } catch (e: any) {
     if (e?.digest?.startsWith('NEXT_REDIRECT')) throw e
-    if (e?.message === 'Unauthorized') redirect('/login')
+    if (e instanceof UnauthorizedError) redirect('/login')
     throw e
   }
 }
@@ -447,12 +447,12 @@ import type { Subscription, Database } from 'nextjs-supabase-stripe/types'
 | Action | Anonymous |
 |---|---|
 | `createCheckout('payment')` | Allowed — order recorded with `user_id = null` |
-| `createCheckout('subscription')` | Throws `Unauthorized` |
-| `getBillingPortal()` | Throws `Unauthorized` |
+| `createCheckout('subscription')` | Throws `UnauthorizedError` |
+| `getBillingPortal()` | Throws `UnauthorizedError` |
 | `getSubscription()` | Returns `null` |
 | `requireActiveSubscription()` | Redirects to `/pricing` |
-| `cancelSubscription()` | Throws `Unauthorized` |
-| `changeSubscription(priceId)` | Throws `Unauthorized` |
+| `cancelSubscription()` | Throws `UnauthorizedError` |
+| `changeSubscription(priceId)` | Throws `UnauthorizedError` |
 
 ## Testing
 

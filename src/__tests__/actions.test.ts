@@ -8,7 +8,21 @@ vi.mock('next/navigation', () => ({ redirect: vi.fn() }))
 vi.mock('@supabase/ssr', () => ({ createServerClient: vi.fn() }))
 vi.mock('../client.js', () => ({ getServiceClient: vi.fn(), getStripeClient: vi.fn() }))
 
-import { cancelSubscription, changeSubscription, createCheckout, getBillingPortal, getSubscription, requireActiveSubscription } from '../actions/stripe.js'
+import {
+  cancelSubscription,
+  changeSubscription,
+  createCheckout,
+  getBillingPortal,
+  getSubscription,
+  requireActiveSubscription,
+} from '../actions/stripe.js'
+import {
+  CustomerNotFoundError,
+  DatabaseError,
+  InvalidRedirectUrlError,
+  NoActiveSubscriptionError,
+  UnauthorizedError,
+} from '../errors.js'
 import { redirect } from 'next/navigation'
 import { createServerClient } from '@supabase/ssr'
 import { getServiceClient, getStripeClient } from '../client.js'
@@ -37,12 +51,33 @@ beforeEach(() => {
   vi.clearAllMocks()
   vi.mocked(redirect).mockImplementation(() => { throw new Error('REDIRECT') })
   vi.mocked(getStripeClient).mockReturnValue(mockStripe as any)
+  process.env.NEXT_PUBLIC_APP_URL = 'https://example.com'
 })
 
 describe('createCheckout', () => {
-  it('throws Unauthorized for subscription mode when not logged in', async () => {
+  it('throws UnauthorizedError for subscription mode when not logged in', async () => {
     vi.mocked(createServerClient).mockReturnValue(mockAuthClient(null) as any)
-    await expect(createCheckout('price_123', 'subscription')).rejects.toThrow('Unauthorized')
+    await expect(createCheckout('price_123', 'subscription')).rejects.toBeInstanceOf(UnauthorizedError)
+  })
+
+  it('throws DatabaseError — not a silent fallback to creating a duplicate customer — when the customer lookup fails for a real reason', async () => {
+    vi.mocked(createServerClient).mockReturnValue(mockAuthClient(USER) as any)
+    const { supabase } = mockSupabase({
+      stripe_customers: { single: { data: null, error: { code: '500', message: 'connection refused' } } },
+    })
+    vi.mocked(getServiceClient).mockReturnValue(supabase)
+
+    await expect(createCheckout('price_123', 'subscription')).rejects.toBeInstanceOf(DatabaseError)
+    expect(mockStripe.checkout.sessions.create).not.toHaveBeenCalled()
+  })
+
+  it('throws InvalidRedirectUrlError when NEXT_PUBLIC_APP_URL is unset', async () => {
+    delete process.env.NEXT_PUBLIC_APP_URL
+    vi.mocked(createServerClient).mockReturnValue(mockAuthClient(null) as any)
+    const { supabase } = mockSupabase({})
+    vi.mocked(getServiceClient).mockReturnValue(supabase)
+
+    await expect(createCheckout('price_123', 'payment')).rejects.toBeInstanceOf(InvalidRedirectUrlError)
   })
 
   it('payment mode proceeds for anonymous user and sets no metadata', async () => {
@@ -89,16 +124,25 @@ describe('createCheckout', () => {
 })
 
 describe('getBillingPortal', () => {
-  it('throws Unauthorized when not logged in', async () => {
+  it('throws UnauthorizedError when not logged in', async () => {
     vi.mocked(createServerClient).mockReturnValue(mockAuthClient(null) as any)
-    await expect(getBillingPortal()).rejects.toThrow('Unauthorized')
+    await expect(getBillingPortal()).rejects.toBeInstanceOf(UnauthorizedError)
   })
 
-  it('throws when user has no Stripe customer row', async () => {
+  it('throws CustomerNotFoundError when user has no Stripe customer row', async () => {
     vi.mocked(createServerClient).mockReturnValue(mockAuthClient(USER) as any)
     const { supabase } = mockSupabase({ stripe_customers: { single: { data: null } } })
     vi.mocked(getServiceClient).mockReturnValue(supabase)
-    await expect(getBillingPortal()).rejects.toThrow('No Stripe customer found')
+    await expect(getBillingPortal()).rejects.toBeInstanceOf(CustomerNotFoundError)
+  })
+
+  it('throws DatabaseError — not CustomerNotFoundError — when the customer lookup fails for a real reason', async () => {
+    vi.mocked(createServerClient).mockReturnValue(mockAuthClient(USER) as any)
+    const { supabase } = mockSupabase({
+      stripe_customers: { single: { data: null, error: { code: '500', message: 'connection refused' } } },
+    })
+    vi.mocked(getServiceClient).mockReturnValue(supabase)
+    await expect(getBillingPortal()).rejects.toBeInstanceOf(DatabaseError)
   })
 
   it('redirects to the billing portal URL', async () => {
@@ -139,6 +183,16 @@ describe('getSubscription', () => {
     // The query chain must include neq filters — asserted via maybeSingle being called
     // (mock only reaches maybeSingle after the full neq→order→limit chain)
     expect(spies('subscriptions').maybeSingleFn).toHaveBeenCalled()
+  })
+
+  it('throws DatabaseError — not null, which would read as "no subscription" — when the query itself fails', async () => {
+    vi.mocked(createServerClient).mockReturnValue(mockAuthClient(USER) as any)
+    const { supabase } = mockSupabase({
+      subscriptions: { maybeSingle: { data: null, error: { code: '500', message: 'connection refused' } } },
+    })
+    vi.mocked(getServiceClient).mockReturnValue(supabase)
+
+    await expect(getSubscription()).rejects.toBeInstanceOf(DatabaseError)
   })
 })
 
@@ -201,17 +255,27 @@ describe('changeSubscription', () => {
     mockSubscriptionUpdate.mockResolvedValue({})
   })
 
-  it('throws Unauthorized when not logged in', async () => {
+  it('throws UnauthorizedError when not logged in', async () => {
     vi.mocked(createServerClient).mockReturnValue(mockAuthClient(null) as any)
-    await expect(changeSubscription(NEW_PRICE_ID)).rejects.toThrow('Unauthorized')
+    await expect(changeSubscription(NEW_PRICE_ID)).rejects.toBeInstanceOf(UnauthorizedError)
   })
 
-  it('throws when user has no active subscription', async () => {
+  it('throws NoActiveSubscriptionError when user has no active subscription', async () => {
     vi.mocked(createServerClient).mockReturnValue(mockAuthClient(USER) as any)
     const { supabase } = mockSupabase({ subscriptions: { maybeSingle: { data: null } } })
     vi.mocked(getServiceClient).mockReturnValue(supabase)
 
-    await expect(changeSubscription(NEW_PRICE_ID)).rejects.toThrow('No active subscription found')
+    await expect(changeSubscription(NEW_PRICE_ID)).rejects.toBeInstanceOf(NoActiveSubscriptionError)
+  })
+
+  it('throws DatabaseError — not NoActiveSubscriptionError — when the subscription lookup fails for a real reason', async () => {
+    vi.mocked(createServerClient).mockReturnValue(mockAuthClient(USER) as any)
+    const { supabase } = mockSupabase({
+      subscriptions: { maybeSingle: { data: null, error: { code: '500', message: 'connection refused' } } },
+    })
+    vi.mocked(getServiceClient).mockReturnValue(supabase)
+
+    await expect(changeSubscription(NEW_PRICE_ID)).rejects.toBeInstanceOf(DatabaseError)
   })
 
   it('retrieves the subscription from Stripe then calls update', async () => {
@@ -277,17 +341,27 @@ describe('cancelSubscription', () => {
     mockSubscriptionCancel.mockResolvedValue({})
   })
 
-  it('throws Unauthorized when not logged in', async () => {
+  it('throws UnauthorizedError when not logged in', async () => {
     vi.mocked(createServerClient).mockReturnValue(mockAuthClient(null) as any)
-    await expect(cancelSubscription()).rejects.toThrow('Unauthorized')
+    await expect(cancelSubscription()).rejects.toBeInstanceOf(UnauthorizedError)
   })
 
-  it('throws when user has no active subscription', async () => {
+  it('throws NoActiveSubscriptionError when user has no active subscription', async () => {
     vi.mocked(createServerClient).mockReturnValue(mockAuthClient(USER) as any)
     const { supabase } = mockSupabase({ subscriptions: { maybeSingle: { data: null } } })
     vi.mocked(getServiceClient).mockReturnValue(supabase)
 
-    await expect(cancelSubscription()).rejects.toThrow('No active subscription found')
+    await expect(cancelSubscription()).rejects.toBeInstanceOf(NoActiveSubscriptionError)
+  })
+
+  it('throws DatabaseError — not NoActiveSubscriptionError — when the subscription lookup fails for a real reason', async () => {
+    vi.mocked(createServerClient).mockReturnValue(mockAuthClient(USER) as any)
+    const { supabase } = mockSupabase({
+      subscriptions: { maybeSingle: { data: null, error: { code: '500', message: 'connection refused' } } },
+    })
+    vi.mocked(getServiceClient).mockReturnValue(supabase)
+
+    await expect(cancelSubscription()).rejects.toBeInstanceOf(DatabaseError)
   })
 
   it('sets cancel_at_period_end: true by default (soft cancel)', async () => {

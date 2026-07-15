@@ -134,7 +134,7 @@ export async function createCheckout(priceId: string, mode: 'payment' | 'subscri
   const supabase = await getAuthClient()
   const { data: { user } } = await supabase.auth.getUser()
 
-  if (mode === 'subscription' && !user) throw new Error('Unauthorized')
+  if (mode === 'subscription' && !user) throw new UnauthorizedError()
 
   // Reuse existing Stripe customer to avoid duplicates on re-subscription
   let existingCustomerId: string | undefined
@@ -451,8 +451,8 @@ User clicks Checkout
 | Function | Anonymous result |
 |---|---|
 | `createCheckout('payment')` | Allowed — proceeds to Stripe without pre-filling email or linking order to a user |
-| `createCheckout('subscription')` | Throws `Unauthorized` — subscriptions require a logged-in user |
-| `getBillingPortal()` | Throws `Unauthorized` |
+| `createCheckout('subscription')` | Throws `UnauthorizedError` — subscriptions require a logged-in user |
+| `getBillingPortal()` | Throws `UnauthorizedError` |
 | `getSubscription()` | Returns `null` — safe to call on any page |
 | `requireActiveSubscription()` | Redirects to `/pricing` — safe to use as a page guard |
 

@@ -168,6 +168,7 @@ import {
   createCheckout as _createCheckout,
   getBillingPortal as _getBillingPortal,
   cancelSubscription as _cancelSubscription,
+  UnauthorizedError,
 } from 'nextjs-supabase-stripe/actions'
 import { redirect } from 'next/navigation'
 
@@ -188,7 +189,7 @@ export async function createCheckout(
     await _createCheckout(priceId, mode)
   } catch (e: any) {
     rethrowRedirect(e)
-    if (e?.message === 'Unauthorized') redirect('/login')
+    if (e instanceof UnauthorizedError) redirect('/login')
     throw e
   }
 }
@@ -198,7 +199,7 @@ export async function getBillingPortal() {
     await _getBillingPortal()
   } catch (e: any) {
     rethrowRedirect(e)
-    if (e?.message === 'Unauthorized') redirect('/login')
+    if (e instanceof UnauthorizedError) redirect('/login')
     throw e
   }
 }
@@ -214,7 +215,7 @@ export async function cancelSubscription(immediately = false) {
 ```
 
 This wrapper:
-- Catches `Unauthorized` errors and redirects to `/login` rather than crashing
+- Catches `UnauthorizedError` and redirects to `/login` rather than crashing
 - Re-throws Next.js redirect errors so they propagate correctly
 - Provides a single place to add logging or error tracking later
 

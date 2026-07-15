@@ -28,9 +28,21 @@ beforeEach(() => {
   vi.clearAllMocks()
   mockConstructEvent.mockReturnValue(MOCK_EVENT)
   vi.mocked(getStripeClient).mockReturnValue(mockStripe as any)
+  process.env.STRIPE_WEBHOOK_SECRET = 'whsec_test_secret'
 })
 
 describe('createWebhookHandler', () => {
+  it('returns 500 with an actionable message and never reads the request body when STRIPE_WEBHOOK_SECRET is missing', async () => {
+    delete process.env.STRIPE_WEBHOOK_SECRET
+    const { supabase } = mockSupabase({})
+    vi.mocked(getServiceClient).mockReturnValue(supabase)
+
+    const res = await createWebhookHandler()(req())
+    expect(res.status).toBe(500)
+    expect(await res.text()).toContain('STRIPE_WEBHOOK_SECRET')
+    expect(getServiceClient).not.toHaveBeenCalled()
+  })
+
   it('processes a valid event and returns 200', async () => {
     const { supabase } = mockSupabase({ webhook_events: {} })
     vi.mocked(getServiceClient).mockReturnValue(supabase)

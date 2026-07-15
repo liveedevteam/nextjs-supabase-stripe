@@ -8,7 +8,7 @@ It helps Claude give accurate assistance when you work with `nextjs-supabase-str
 ## What this package exports
 
 ```ts
-import { createCheckout, getBillingPortal, getSubscription, requireActiveSubscription, changeSubscription, cancelSubscription } from 'nextjs-supabase-stripe/actions'
+import { createCheckout, getBillingPortal, getSubscription, requireActiveSubscription, changeSubscription, cancelSubscription, UnauthorizedError, CustomerNotFoundError, NoActiveSubscriptionError, DatabaseError, InvalidRedirectUrlError } from 'nextjs-supabase-stripe/actions'
 import { createWebhookHandler } from 'nextjs-supabase-stripe/webhooks'
 import { buildWebhookRequest, stripeFixtures } from 'nextjs-supabase-stripe/testing'
 import type { Subscription, Database } from 'nextjs-supabase-stripe/types'
@@ -29,8 +29,10 @@ createCheckout(priceId: string, mode: 'payment' | 'subscription'): Promise<never
 
 - Redirects to Stripe Checkout. Never returns — always throws a redirect.
 - `mode: 'payment'` — anonymous users allowed. Order recorded with `user_id = null`.
-- `mode: 'subscription'` — throws `Error('Unauthorized')` if not logged in.
+- `mode: 'subscription'` — throws `UnauthorizedError` if not logged in.
 - Sets `metadata.user_id` on the Stripe session when user is logged in.
+- Throws `InvalidRedirectUrlError` if `NEXT_PUBLIC_APP_URL` is unset or not a valid absolute URL.
+- Throws `DatabaseError` if the existing-customer lookup fails for a reason other than "no row" — never silently falls through to creating a duplicate Stripe customer.
 
 ### `getBillingPortal()`
 
@@ -39,8 +41,10 @@ getBillingPortal(): Promise<never>
 ```
 
 - Redirects to Stripe Billing Portal. Requires a logged-in user with an existing `stripe_customers` record.
-- Throws `Error('Unauthorized')` if not logged in.
-- Throws `Error('No Stripe customer found for this user')` if the user has no Stripe customer yet (hasn't completed a subscription checkout).
+- Throws `UnauthorizedError` if not logged in.
+- Throws `CustomerNotFoundError` if the user has no Stripe customer yet (hasn't completed a subscription checkout).
+- Throws `DatabaseError` if the customer lookup itself fails — never reported as `CustomerNotFoundError`.
+- Throws `InvalidRedirectUrlError` if `NEXT_PUBLIC_APP_URL` is unset or not a valid absolute URL.
 
 ### `getSubscription()`
 
@@ -51,7 +55,7 @@ getSubscription(): Promise<Subscription | null>
 - Returns the user's most recent non-terminal subscription row from `subscriptions` table, or `null`.
 - Filters out `canceled` and `incomplete_expired` rows. Returns the row with the latest `current_period_end`.
 - Safe to call for anonymous users — returns `null`.
-- Does NOT throw. Always use null-check on the result.
+- Returns `null` only when the user genuinely has no matching row. Throws `DatabaseError` if the query itself fails — a database outage is never reported as "no subscription".
 
 ### `requireActiveSubscription()`
 
@@ -73,8 +77,9 @@ cancelSubscription(immediately?: boolean): Promise<void>
 - `immediately = false` (default): sets `cancel_at_period_end: true` — user keeps access until end of billing period. Stripe fires `customer.subscription.updated`.
 - `immediately = true`: calls `stripe.subscriptions.cancel` — access cut off immediately. Stripe fires `customer.subscription.deleted`.
 - In both cases the DB is updated automatically by the existing webhook handlers.
-- Throws `Error('Unauthorized')` if not logged in.
-- Throws `Error('No active subscription found')` if no `active`, `trialing`, or `past_due` subscription exists.
+- Throws `UnauthorizedError` if not logged in.
+- Throws `NoActiveSubscriptionError` if no `active`, `trialing`, or `past_due` subscription exists.
+- Throws `DatabaseError` if the subscription lookup itself fails.
 
 ### `changeSubscription(newPriceId, prorationBehavior?)`
 
@@ -86,8 +91,9 @@ changeSubscription(
 ```
 
 - Upgrades or downgrades the user's current subscription to a new price.
-- Throws `Error('Unauthorized')` if not logged in.
-- Throws `Error('No active subscription found')` if the user has no `active`, `trialing`, or `past_due` subscription.
+- Throws `UnauthorizedError` if not logged in.
+- Throws `NoActiveSubscriptionError` if the user has no `active`, `trialing`, or `past_due` subscription.
+- Throws `DatabaseError` if the subscription lookup itself fails.
 - `prorationBehavior` defaults to `'create_prorations'` (credit/charge deferred to next invoice).
 - Does NOT redirect. Returns `Promise<void>` — call from a Server Action wrapper.
 - The DB is updated automatically when Stripe fires `customer.subscription.updated`.
@@ -120,12 +126,12 @@ export const POST = createWebhookHandler({ slack: { webhookUrl: process.env.SLAC
 | Function | Not logged in |
 |---|---|
 | `createCheckout('payment')` | Proceeds — `user_id = null` in DB |
-| `createCheckout('subscription')` | Throws `Unauthorized` |
-| `getBillingPortal()` | Throws `Unauthorized` |
+| `createCheckout('subscription')` | Throws `UnauthorizedError` |
+| `getBillingPortal()` | Throws `UnauthorizedError` |
 | `getSubscription()` | Returns `null` |
 | `requireActiveSubscription()` | Redirects to `/pricing` |
-| `changeSubscription(priceId)` | Throws `Unauthorized` |
-| `cancelSubscription()` | Throws `Unauthorized` |
+| `changeSubscription(priceId)` | Throws `UnauthorizedError` |
+| `cancelSubscription()` | Throws `UnauthorizedError` |
 
 **Important:** Never render `<CheckoutButton mode="subscription">` or `<BillingPortalButton>` for anonymous users without a session guard — they will throw on submit.
 
@@ -159,6 +165,11 @@ SUPABASE_SERVICE_ROLE_KEY
 SLACK_WEBHOOK_URL   # optional
 ```
 
+Each is validated lazily, the first time it's actually needed (not at import time — importing this
+package must never break a Next.js build before real env vars are available). A missing variable
+throws `MissingEnvironmentVariableError` listing every missing variable for that call, not just the
+first one found.
+
 ---
 
 ## Common mistakes
@@ -167,7 +178,8 @@ SLACK_WEBHOOK_URL   # optional
 - **Using `getUser()` on a service-role Supabase client** — it always returns null server-side. This package already handles auth correctly; don't replicate the pattern with a service-role singleton.
 - **Calling `req.json()` in a webhook handler** — breaks Stripe signature verification. This package uses `req.text()` correctly.
 - **Showing subscription/portal buttons to anonymous users without a guard** — they throw on submit. Check session before rendering.
-- **Forgetting `STRIPE_WEBHOOK_SECRET`** — the webhook handler returns `400 Invalid signature` for every event without it.
+- **Forgetting `STRIPE_WEBHOOK_SECRET`** — the webhook handler returns `500` with a message naming the missing variable (not a misleading `400 Invalid signature`).
+- **Matching on `error.message` instead of `instanceof`** — this package exports typed errors (`UnauthorizedError`, `CustomerNotFoundError`, `NoActiveSubscriptionError`, `DatabaseError`, `InvalidRedirectUrlError`) from `nextjs-supabase-stripe/actions`. Prefer `if (e instanceof UnauthorizedError)` over `if (e.message === 'Unauthorized')`.
 
 ---
 
