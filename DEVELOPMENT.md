@@ -305,36 +305,25 @@ export const POST = createWebhookHandler({
 
 ### 6. Webhook Events Handled
 
+Do not hand-copy the switch statement here — it drifts (this section previously did). See
+`src/webhooks/events/index.ts` for the current routing.
+
 | Event | Action |
 |---|---|
-| `checkout.session.completed` | Write to `orders` or link subscription |
-| `customer.subscription.updated` | Sync status to `subscriptions` |
-| `customer.subscription.created` | Insert to `subscriptions` |
-| `customer.subscription.deleted` | Mark subscription canceled |
-| `invoice.payment_failed` | Notify user, trigger dunning |
-| `invoice.paid` | Record payment history |
+| `checkout.session.completed` | Payment mode: insert `orders` row (`status: 'paid'` or `'pending'` per `payment_status`). Subscription mode: upsert `stripe_customers` |
+| `checkout.session.async_payment_succeeded` | Transition a `pending` order to `paid` — a delayed payment method (e.g. bank debit) cleared |
+| `checkout.session.async_payment_failed` | Transition a `pending` order to `failed` |
+| `customer.subscription.created` / `.updated` | Fetch the subscription fresh from Stripe (`stripe.subscriptions.retrieve`) and upsert `subscriptions` with the returned state |
+| `customer.subscription.deleted` | Same fetch-and-upsert — subscriptions are never hard-deleted in Stripe, cancellation just sets `status: 'canceled'`, so the fetch reflects that |
+| `invoice.paid` | Same fetch-and-upsert, keyed off the invoice's subscription ID |
+| `invoice.payment_failed` | Same fetch-and-upsert — writes whatever status Stripe put the subscription in (`past_due`, `unpaid`, or `canceled` depending on dunning settings), not a hardcoded value |
 | `customer.subscription.trial_will_end` | Intentional no-op — add your own notification logic |
 
-```ts
-// src/webhooks/events/index.ts
-export const handleEvent = async (event: Stripe.Event, supabase: SupabaseClient) => {
-  switch (event.type) {
-    case 'checkout.session.completed':
-      return onCheckoutCompleted(event.data.object as Stripe.Checkout.Session, supabase)
-    case 'customer.subscription.updated':
-    case 'customer.subscription.created':
-      return onSubscriptionUpdated(event.data.object as Stripe.Subscription, supabase)
-    case 'customer.subscription.deleted':
-      return onSubscriptionDeleted(event.data.object as Stripe.Subscription, supabase)
-    case 'invoice.payment_failed':
-      return onPaymentFailed(event.data.object as Stripe.Invoice, supabase)
-    case 'invoice.paid':
-      return onInvoicePaid(event.data.object as Stripe.Invoice, supabase)
-    case 'customer.subscription.trial_will_end':
-      return onTrialWillEnd(event.data.object as Stripe.Subscription, supabase)
-  }
-}
-```
+All subscription-lifecycle events converge on one function
+(`src/webhooks/events/subscription-sync.ts`) instead of writing each event's own payload. This is
+what makes webhook delivery order harmless: two events for the same subscription, in either order,
+both write the same current Stripe truth, so a delayed `invoice.paid` can't reactivate a subscription
+that's since been canceled.
 
 ---
 

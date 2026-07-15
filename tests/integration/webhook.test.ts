@@ -1,9 +1,11 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { createWebhookHandler } from '../../src/webhooks/handler.js'
 import { buildWebhookRequest, stripeFixtures } from '../../src/testing.js'
+import type Stripe from 'stripe'
 import {
   db,
   skipIfNotLocal,
+  stripeStub,
   WEBHOOK_SECRET,
   seedUser,
   seedCustomer,
@@ -73,18 +75,25 @@ describe.skipIf(skipIfNotLocal)('webhook handler', () => {
   })
 
   it('handler throws → 500 and claim row deleted so Stripe can retry', async () => {
-    // Subscription event for a customer with no stripe_customers row causes
-    // resolveUserId to throw "No user found for customer" — a real handler error.
+    // Stripe's live state for this subscription belongs to a customer with no
+    // stripe_customers row, so resolveUserId throws "No user found for
+    // customer" once syncSubscriptionFromStripe fetches it — a real handler error.
+    const subId = 'sub_fixture'
+    const stripeWithOrphan = stripeStub({
+      [subId]: stripeFixtures.subscription({ id: subId, customerId: 'cus_orphan_no_such_customer' }) as unknown as Stripe.Subscription,
+    })
+    const orphanHandler = createWebhookHandler({ stripe: stripeWithOrphan })
+
     const req = buildWebhookRequest(
       'customer.subscription.created',
-      stripeFixtures.subscription({ customerId: 'cus_orphan_no_such_customer' }),
+      stripeFixtures.subscription({ id: subId }),
       { secret: WEBHOOK_SECRET },
     )
     const body = await req.clone().text()
     const eventId = JSON.parse(body).id
     // Do NOT push to trackedEventIds — the handler should delete it; afterEach should be a no-op
 
-    const res = await handler(req)
+    const res = await orphanHandler(req)
     expect(res.status).toBe(500)
 
     // Claim must be deleted so Stripe retries the event

@@ -1,5 +1,7 @@
 import { createClient } from '@supabase/supabase-js'
 import type { SupabaseClient } from '@supabase/supabase-js'
+import Stripe from 'stripe'
+import { vi } from 'vitest'
 import type { Database } from '../../src/database.types.js'
 
 // ─── Guard ────────────────────────────────────────────────────────────────────
@@ -36,6 +38,33 @@ export function db(): SupabaseClient<Database> {
 // ─── Signing secret ───────────────────────────────────────────────────────────
 // Must match STRIPE_WEBHOOK_SECRET set in vitest.integration.config.ts
 export const WEBHOOK_SECRET = 'whsec_integration_test_secret'
+
+// ─── Stripe stub ──────────────────────────────────────────────────────────────
+// The webhook handler is fetch-driven (see src/webhooks/events/subscription-sync.ts):
+// subscription and invoice events retrieve the subscription fresh from Stripe
+// rather than trusting the event payload. Integration tests can't make live
+// Stripe API calls, so pass createWebhookHandler({ stripe: stripeStub(...) }).
+// constructEvent delegates to a real (network-free) Stripe SDK instance so
+// signature verification behaves exactly like production; subscriptions.retrieve
+// reads the `subscriptions` record at call time, not a snapshot — mutate it
+// between handler() calls in a test to simulate Stripe's state changing
+// between webhook deliveries.
+const signingStripe = new Stripe('sk_test_integration_placeholder', { apiVersion: '2026-05-27.dahlia' })
+
+export function stripeStub(subscriptions: Record<string, Stripe.Subscription> = {}): Stripe {
+  return {
+    webhooks: {
+      constructEvent: signingStripe.webhooks.constructEvent.bind(signingStripe.webhooks),
+    },
+    subscriptions: {
+      retrieve: vi.fn((id: string) => {
+        const sub = subscriptions[id]
+        if (!sub) throw new Error(`stripeStub: no subscription registered for id "${id}"`)
+        return Promise.resolve(sub)
+      }),
+    },
+  } as unknown as Stripe
+}
 
 // ─── Seed helpers ─────────────────────────────────────────────────────────────
 

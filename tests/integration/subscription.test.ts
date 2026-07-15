@@ -1,9 +1,11 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { createWebhookHandler } from '../../src/webhooks/handler.js'
 import { buildWebhookRequest, stripeFixtures } from '../../src/testing.js'
+import type Stripe from 'stripe'
 import {
   db,
   skipIfNotLocal,
+  stripeStub,
   WEBHOOK_SECRET,
   seedUser,
   seedCustomer,
@@ -11,8 +13,6 @@ import {
   cleanupUser,
   cleanupWebhookEvents,
 } from './setup.js'
-
-const handler = createWebhookHandler()
 
 describe.skipIf(skipIfNotLocal)('subscription lifecycle handlers', () => {
   let userId: string
@@ -32,23 +32,26 @@ describe.skipIf(skipIfNotLocal)('subscription lifecycle handlers', () => {
 
   // ─── customer.subscription.created ─────────────────────────────────────────
 
-  it('customer.subscription.created → row inserted with correct fields', async () => {
+  it('customer.subscription.created → fetches the subscription from Stripe and writes it', async () => {
     const subId = `sub_created_${Date.now()}`
     const priceId = `price_created_${Date.now()}`
+    const stripe = stripeStub({
+      [subId]: stripeFixtures.subscription({ id: subId, customerId, priceId, status: 'active' }) as unknown as Stripe.Subscription,
+    })
+    const handler = createWebhookHandler({ stripe })
+
+    // The event payload only needs to carry the ID — everything else written
+    // to the DB comes from stripe.subscriptions.retrieve(), not this payload.
     const req = buildWebhookRequest(
       'customer.subscription.created',
-      stripeFixtures.subscription({
-        id: subId,
-        customerId,
-        priceId,
-        status: 'active',
-      }),
+      stripeFixtures.subscription({ id: subId, customerId }),
       { secret: WEBHOOK_SECRET },
     )
     trackedEventIds.push(JSON.parse(await req.clone().text()).id)
 
     const res = await handler(req)
     expect(res.status).toBe(200)
+    expect(stripe.subscriptions.retrieve).toHaveBeenCalledWith(subId)
 
     const { data, error } = await db()
       .from('subscriptions')
@@ -64,14 +67,19 @@ describe.skipIf(skipIfNotLocal)('subscription lifecycle handlers', () => {
 
   it('dahlia regression — period dates read from items.data[0], not subscription root', async () => {
     // stripeFixtures.subscription() puts period dates ONLY on items.data[0].
-    // If the handler reads from subscription root (pre-dahlia), it would write
-    // undefined/wrong values. This test proves the handler reads the correct location.
+    // If the sync function read from subscription root (pre-dahlia), it would
+    // write undefined/wrong values. This test proves it reads the correct location.
     const subId = `sub_dahlia_${Date.now()}`
     const periodStart = 1700000000
     const periodEnd = 1702678400
+    const stripe = stripeStub({
+      [subId]: stripeFixtures.subscription({ id: subId, customerId, periodStart, periodEnd }) as unknown as Stripe.Subscription,
+    })
+    const handler = createWebhookHandler({ stripe })
+
     const req = buildWebhookRequest(
       'customer.subscription.created',
-      stripeFixtures.subscription({ id: subId, customerId, periodStart, periodEnd }),
+      stripeFixtures.subscription({ id: subId, customerId }),
       { secret: WEBHOOK_SECRET },
     )
     trackedEventIds.push(JSON.parse(await req.clone().text()).id)
@@ -94,9 +102,14 @@ describe.skipIf(skipIfNotLocal)('subscription lifecycle handlers', () => {
     await seedSubscription({ userId, stripeSubscriptionId: subId, status: 'trialing' })
 
     const newPriceId = `price_updated_${Date.now()}`
+    const stripe = stripeStub({
+      [subId]: stripeFixtures.subscription({ id: subId, customerId, priceId: newPriceId, status: 'active' }) as unknown as Stripe.Subscription,
+    })
+    const handler = createWebhookHandler({ stripe })
+
     const req = buildWebhookRequest(
       'customer.subscription.updated',
-      stripeFixtures.subscription({ id: subId, customerId, priceId: newPriceId, status: 'active' }),
+      stripeFixtures.subscription({ id: subId, customerId }),
       { secret: WEBHOOK_SECRET },
     )
     trackedEventIds.push(JSON.parse(await req.clone().text()).id)
@@ -115,7 +128,7 @@ describe.skipIf(skipIfNotLocal)('subscription lifecycle handlers', () => {
 
   // ─── customer.subscription.deleted ─────────────────────────────────────────
 
-  it('customer.subscription.deleted → status set to canceled (no-op guard: assert row existed before)', async () => {
+  it('customer.subscription.deleted → status set to canceled — subscriptions are never hard-deleted in Stripe, retrieve() still resolves', async () => {
     const subId = `sub_deleted_${Date.now()}`
     await seedSubscription({ userId, stripeSubscriptionId: subId, status: 'active' })
 
@@ -127,9 +140,14 @@ describe.skipIf(skipIfNotLocal)('subscription lifecycle handlers', () => {
       .single()
     expect(before?.status).toBe('active')
 
+    const stripe = stripeStub({
+      [subId]: stripeFixtures.subscription({ id: subId, customerId, status: 'canceled' }) as unknown as Stripe.Subscription,
+    })
+    const handler = createWebhookHandler({ stripe })
+
     const req = buildWebhookRequest(
       'customer.subscription.deleted',
-      stripeFixtures.subscription({ id: subId, customerId, status: 'canceled' }),
+      stripeFixtures.subscription({ id: subId, customerId }),
       { secret: WEBHOOK_SECRET },
     )
     trackedEventIds.push(JSON.parse(await req.clone().text()).id)
@@ -147,29 +165,33 @@ describe.skipIf(skipIfNotLocal)('subscription lifecycle handlers', () => {
 
   // ─── invoice.paid ───────────────────────────────────────────────────────────
 
-  it('invoice.paid → status set to active, period timestamps updated (no-op guard)', async () => {
+  it('invoice.paid → fetches the subscription and writes its current status and period timestamps', async () => {
     const subId = `sub_invpaid_${Date.now()}`
     await seedSubscription({ userId, stripeSubscriptionId: subId, status: 'past_due' })
 
-    // Guard: verify the row exists before the update so a silent no-op would fail
-    const { data: before } = await db()
-      .from('subscriptions')
-      .select('status')
-      .eq('stripe_subscription_id', subId)
-      .single()
-    expect(before?.status).toBe('past_due')
-
     const newPeriodStart = 1705000000
     const newPeriodEnd = 1707678400
+    const stripe = stripeStub({
+      [subId]: stripeFixtures.subscription({
+        id: subId,
+        customerId,
+        status: 'active',
+        periodStart: newPeriodStart,
+        periodEnd: newPeriodEnd,
+      }) as unknown as Stripe.Subscription,
+    })
+    const handler = createWebhookHandler({ stripe })
+
     const req = buildWebhookRequest(
       'invoice.paid',
-      stripeFixtures.invoice({ subscriptionId: subId, periodStart: newPeriodStart, periodEnd: newPeriodEnd }),
+      stripeFixtures.invoice({ subscriptionId: subId }),
       { secret: WEBHOOK_SECRET },
     )
     trackedEventIds.push(JSON.parse(await req.clone().text()).id)
 
     const res = await handler(req)
     expect(res.status).toBe(200)
+    expect(stripe.subscriptions.retrieve).toHaveBeenCalledWith(subId)
 
     const { data: after } = await db()
       .from('subscriptions')
@@ -181,18 +203,45 @@ describe.skipIf(skipIfNotLocal)('subscription lifecycle handlers', () => {
     expect(new Date(after!.current_period_end!).toISOString()).toBe(new Date(newPeriodEnd * 1000).toISOString())
   })
 
-  // ─── invoice.payment_failed ─────────────────────────────────────────────────
+  it('cannot reactivate a subscription Stripe has since canceled — a delayed invoice.paid writes the fetched (canceled) status', async () => {
+    const subId = `sub_delayed_${Date.now()}`
+    await seedSubscription({ userId, stripeSubscriptionId: subId, status: 'canceled' })
 
-  it('invoice.payment_failed → status set to past_due (no-op guard)', async () => {
-    const subId = `sub_invfail_${Date.now()}`
-    await seedSubscription({ userId, stripeSubscriptionId: subId, status: 'active' })
+    // Stripe's live state says canceled — an invoice.paid event that was
+    // queued/retried from before the cancellation must not undo it.
+    const stripe = stripeStub({
+      [subId]: stripeFixtures.subscription({ id: subId, customerId, status: 'canceled' }) as unknown as Stripe.Subscription,
+    })
+    const handler = createWebhookHandler({ stripe })
 
-    const { data: before } = await db()
+    const req = buildWebhookRequest(
+      'invoice.paid',
+      stripeFixtures.invoice({ subscriptionId: subId }),
+      { secret: WEBHOOK_SECRET },
+    )
+    trackedEventIds.push(JSON.parse(await req.clone().text()).id)
+
+    const res = await handler(req)
+    expect(res.status).toBe(200)
+
+    const { data: after } = await db()
       .from('subscriptions')
       .select('status')
       .eq('stripe_subscription_id', subId)
       .single()
-    expect(before?.status).toBe('active')
+    expect(after?.status).toBe('canceled')
+  })
+
+  // ─── invoice.payment_failed ─────────────────────────────────────────────────
+
+  it('invoice.payment_failed → fetches the subscription and writes whatever status Stripe put it in', async () => {
+    const subId = `sub_invfail_${Date.now()}`
+    await seedSubscription({ userId, stripeSubscriptionId: subId, status: 'active' })
+
+    const stripe = stripeStub({
+      [subId]: stripeFixtures.subscription({ id: subId, customerId, status: 'past_due' }) as unknown as Stripe.Subscription,
+    })
+    const handler = createWebhookHandler({ stripe })
 
     const req = buildWebhookRequest(
       'invoice.payment_failed',

@@ -1,3 +1,4 @@
+import type Stripe from 'stripe'
 import { getServiceClient, getStripeClient } from '../client.js'
 import { handleEvent } from './events/index.js'
 import { notifySlack } from './notifier.js'
@@ -7,12 +8,19 @@ interface WebhookHandlerOptions {
     webhookUrl: string
     channel?: string
   }
+  /**
+   * Override the Stripe client used for signature verification and for
+   * fetching current subscription state. Defaults to getStripeClient().
+   * Exists for integration tests, which can't make live Stripe API calls —
+   * see tests/integration/setup.ts's stripeStub.
+   */
+  stripe?: Stripe
 }
 
 export const createWebhookHandler = (options: WebhookHandlerOptions = {}) =>
   async (req: Request): Promise<Response> => {
     const supabase = getServiceClient()
-    const stripe = getStripeClient()
+    const stripe = options.stripe ?? getStripeClient()
     const sig = req.headers.get('stripe-signature')!
     const body = await req.text()
 
@@ -32,7 +40,7 @@ export const createWebhookHandler = (options: WebhookHandlerOptions = {}) =>
     if (claimError) return new Response('Database error', { status: 500 })
 
     try {
-      await handleEvent(event, supabase)
+      await handleEvent(event, supabase, stripe)
     } catch (error) {
       // Release the claim so Stripe can retry
       await supabase.from('webhook_events').delete().eq('id', event.id)

@@ -38,7 +38,7 @@ describe('createWebhookHandler', () => {
 
     const res = await createWebhookHandler()(req())
     expect(res.status).toBe(200)
-    expect(handleEvent).toHaveBeenCalledWith(MOCK_EVENT, supabase)
+    expect(handleEvent).toHaveBeenCalledWith(MOCK_EVENT, supabase, mockStripe)
   })
 
   it('returns 200 "Already processed" when event ID is already in webhook_events (23505)', async () => {
