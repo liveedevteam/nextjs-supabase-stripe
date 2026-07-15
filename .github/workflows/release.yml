@@ -1,15 +1,31 @@
 name: Release
 
+# Triggered by pushing a tag matching v* (e.g. v0.3.0). This is the only
+# supported way to publish nextjs-supabase-stripe to npm — there is no
+# manual `npm publish` from a laptop anymore. See DEVELOPMENT.md for the
+# release checklist.
 on:
   push:
     tags:
       - 'v*'
 
+permissions:
+  contents: read
+  # Required for npm trusted publishing (OIDC) — npm exchanges this token
+  # for a short-lived publish credential. No NPM_TOKEN secret needed,
+  # provided the npm account has this repo + this workflow file registered
+  # as a Trusted Publisher for nextjs-supabase-stripe on npmjs.com (Package
+  # Settings → Publishing access). That link cannot be created via CLI/API —
+  # it's a one-time manual step on npmjs.com.
+  id-token: write
+
 jobs:
-  publish:
+  integration:
+    uses: ./.github/workflows/_integration-tests.yml
+
+  release:
+    needs: integration
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
     steps:
       - uses: actions/checkout@v4
 
@@ -21,17 +37,75 @@ jobs:
         with:
           node-version: 22
           cache: pnpm
+          registry-url: https://registry.npmjs.org
+
+      - name: Require npm >=11.5.1 for trusted publishing
+        run: npm install -g npm@latest
+
+      - name: Verify tag matches package.json version
+        run: |
+          tag_version="${GITHUB_REF_NAME#v}"
+          pkg_version=$(node -p "require('./package.json').version")
+          if [ "$tag_version" != "$pkg_version" ]; then
+            echo "::error::Tag v${tag_version} does not match package.json version ${pkg_version}."
+            exit 1
+          fi
+          echo "Tag matches package.json version: ${pkg_version}"
 
       - run: pnpm install --frozen-lockfile
-
+      - run: pnpm typecheck
+      - run: pnpm test
       - run: pnpm build
 
-      - name: Set npm auth token
-        run: echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" >> ~/.npmrc
-        env:
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+      - name: Pack tarball
+        run: npm pack --pack-destination /tmp/pack
 
-      - name: Verify npm auth
-        run: npm whoami
+      - name: Extract tarball
+        run: |
+          mkdir -p /tmp/pack/extracted
+          tar -xzf /tmp/pack/*.tgz -C /tmp/pack/extracted --strip-components=1
 
-      - run: npm publish --access public
+      - name: Assert package contents
+        run: node scripts/release/verify-tarball-contents.mjs /tmp/pack/extracted
+
+      - name: Import every public export from the packed tarball
+        # Installs the tarball into a throwaway sandbox alongside the peer
+        # deps it needs, exactly like a real consumer would, then imports
+        # every entry point via both ESM and CJS. See scripts/release/
+        # smoke-import.mjs for why /actions is verified separately below
+        # instead (Next.js's export map only resolves through its bundler).
+        run: |
+          pkg_version=$(node -p "require('./package.json').version")
+          mkdir -p /tmp/pack/sandbox
+          cd /tmp/pack/sandbox
+          echo '{"name":"pkg-smoke","private":true,"type":"module"}' > package.json
+          npm install /tmp/pack/nextjs-supabase-stripe-${pkg_version}.tgz \
+            next@$(node -p "require('$GITHUB_WORKSPACE/package.json').devDependencies.next") \
+            @supabase/ssr@$(node -p "require('$GITHUB_WORKSPACE/package.json').devDependencies['@supabase/ssr']") \
+            @supabase/supabase-js@$(node -p "require('$GITHUB_WORKSPACE/package.json').devDependencies['@supabase/supabase-js']") \
+            stripe@$(node -p "require('$GITHUB_WORKSPACE/package.json').devDependencies.stripe") \
+            --no-audit --no-fund
+          cp "$GITHUB_WORKSPACE"/scripts/release/smoke-import.mjs .
+          cp "$GITHUB_WORKSPACE"/scripts/release/smoke-import.cjs .
+          node smoke-import.mjs
+          node smoke-import.cjs
+
+      - name: Demo build against the packed tarball
+        # Verifies nextjs-supabase-stripe/actions (next/headers, next/navigation)
+        # through Next's real module resolver, which the sandbox import test
+        # above cannot do — plain Node can't resolve Next's export map.
+        run: |
+          pkg_version=$(node -p "require('./package.json').version")
+          cp /tmp/pack/nextjs-supabase-stripe-${pkg_version}.tgz demo/nextjs-supabase-stripe.tgz
+          node -e "
+            const fs = require('fs');
+            const p = JSON.parse(fs.readFileSync('demo/package.json', 'utf8'));
+            p.dependencies['nextjs-supabase-stripe'] = 'file:./nextjs-supabase-stripe.tgz';
+            fs.writeFileSync('demo/package.json', JSON.stringify(p, null, 2) + '\n');
+          "
+          cd demo
+          pnpm install --no-frozen-lockfile
+          pnpm build
+
+      - name: Publish to npm
+        run: npm publish --provenance

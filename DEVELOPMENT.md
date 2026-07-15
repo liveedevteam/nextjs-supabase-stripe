@@ -480,3 +480,23 @@ Anonymous one-time payment orders are recorded in `orders` with `user_id = null`
 4. **Not running backfill in staging first** — always validate backfill against a staging DB before production.
 5. **Using service-role key to identify the current user** — `supabase.auth.getUser()` on a service-role client has no session and always returns null. Use `@supabase/ssr` `createServerClient` with `cookies()` in server actions. The service-role client is correct for the webhook handler and DB writes that bypass RLS.
 6. **Rendering checkout/portal buttons for anonymous users without a guard** — `createCheckout('subscription')` and `getBillingPortal` throw for anonymous users. Wrap them in a session check or only render them on authenticated pages.
+
+---
+
+## Releasing a new version
+
+Publishing only happens through `.github/workflows/release.yml`, triggered by pushing a `v*` tag —
+there is no manual `npm publish`. That workflow runs the full gate (typecheck, unit tests,
+integration tests, build, package-content assertion, tarball import smoke test, demo build against
+the packed tarball) before publishing via npm trusted publishing (OIDC) — no `NPM_TOKEN` secret.
+
+1. Bump `"version"` in `package.json`.
+2. Add a `CHANGELOG.md` entry for the new version.
+3. Merge that to `main`.
+4. Tag and push: `git tag v<version> && git push origin v<version>`.
+5. Watch the `Release` workflow run in GitHub Actions.
+
+One-time setup (already done for this package, documented here in case it needs redoing): the npm
+account must register this repo and `.github/workflows/release.yml` as a **Trusted Publisher** for
+`nextjs-supabase-stripe` — npmjs.com → package → Settings → Publishing access. This can't be done via
+CLI/API, only the npmjs.com web UI.
