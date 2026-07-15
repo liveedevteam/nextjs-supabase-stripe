@@ -1,6 +1,6 @@
 'use server'
 
-import { createCheckout as _createCheckout } from 'nextjs-supabase-stripe/actions'
+import { createCheckout as _createCheckout, UnauthorizedError } from 'nextjs-supabase-stripe/actions'
 import { redirect } from 'next/navigation'
 
 export async function createCheckout(priceId: string, mode: 'subscription' | 'payment') {
@@ -9,7 +9,7 @@ export async function createCheckout(priceId: string, mode: 'subscription' | 'pa
   } catch (e: any) {
     // redirect() throws internally — re-throw it
     if (e?.digest?.startsWith('NEXT_REDIRECT')) throw e
-    if (e?.message === 'Unauthorized') redirect('/login')
+    if (e instanceof UnauthorizedError) redirect('/login')
     console.error('[createCheckout] error:', e?.message, e?.type, e?.statusCode)
     throw e
   }

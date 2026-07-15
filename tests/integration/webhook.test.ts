@@ -10,6 +10,7 @@ import {
   seedUser,
   seedCustomer,
   cleanupUser,
+  cleanupOrders,
   cleanupWebhookEvents,
 } from './setup.js'
 
@@ -19,6 +20,7 @@ describe.skipIf(skipIfNotLocal)('webhook handler', () => {
   let userId: string
   let customerId: string
   const trackedEventIds: string[] = []
+  const trackedSessionIds: string[] = []
 
   beforeEach(async () => {
     userId = await seedUser()
@@ -27,14 +29,17 @@ describe.skipIf(skipIfNotLocal)('webhook handler', () => {
   })
 
   afterEach(async () => {
+    await cleanupOrders(trackedSessionIds.splice(0))
     await cleanupWebhookEvents(trackedEventIds.splice(0))
     await cleanupUser(userId)
   })
 
   it('valid event → 200 and row written to webhook_events', async () => {
+    const sessionId = `cs_wh_valid_${Date.now()}`
+    trackedSessionIds.push(sessionId)
     const req = buildWebhookRequest(
       'checkout.session.completed',
-      stripeFixtures.checkoutSessionCompleted({ mode: 'payment', userId: null }),
+      stripeFixtures.checkoutSessionCompleted({ id: sessionId, mode: 'payment', userId: null }),
       { secret: WEBHOOK_SECRET },
     )
     const body = await req.clone().text()

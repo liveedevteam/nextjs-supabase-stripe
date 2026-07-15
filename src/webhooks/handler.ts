@@ -1,7 +1,10 @@
 import type Stripe from 'stripe'
 import { getServiceClient, getStripeClient } from '../client.js'
+import { MissingEnvironmentVariableError } from '../errors.js'
 import { handleEvent } from './events/index.js'
 import { notifySlack } from './notifier.js'
+
+export { MissingEnvironmentVariableError }
 
 interface WebhookHandlerOptions {
   slack?: {
@@ -19,8 +22,26 @@ interface WebhookHandlerOptions {
 
 export const createWebhookHandler = (options: WebhookHandlerOptions = {}) =>
   async (req: Request): Promise<Response> => {
-    const supabase = getServiceClient()
-    const stripe = options.stripe ?? getStripeClient()
+    // Validated per-request, not at createWebhookHandler() call time — that
+    // call typically happens at module scope in a route.ts file
+    // (`export const POST = createWebhookHandler()`), which Next.js
+    // evaluates during build before real env vars are necessarily present.
+    let supabase: ReturnType<typeof getServiceClient>
+    let stripe: Stripe
+    try {
+      if (!process.env.STRIPE_WEBHOOK_SECRET) {
+        throw new MissingEnvironmentVariableError('createWebhookHandler', ['STRIPE_WEBHOOK_SECRET'])
+      }
+      supabase = getServiceClient()
+      stripe = options.stripe ?? getStripeClient()
+    } catch (err) {
+      if (err instanceof MissingEnvironmentVariableError) {
+        console.error(err.message)
+        return new Response(err.message, { status: 500 })
+      }
+      throw err
+    }
+
     const sig = req.headers.get('stripe-signature')!
     const body = await req.text()
 
