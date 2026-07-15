@@ -4,10 +4,20 @@ import type { Database } from '../../src/database.types.js'
 
 // ─── Guard ────────────────────────────────────────────────────────────────────
 // Tests describe.skipIf(skipIfNotLocal) so they degrade gracefully when local
-// Supabase is not running (CI without the integration job, dev pointing at prod).
+// Supabase is not running (dev pointing at prod, credentials not set).
+//
+// Matches both `localhost` and `127.0.0.1` — `supabase status --output env`
+// returns `http://127.0.0.1:54321`, not `localhost`, so a substring match on
+// "localhost" alone silently skipped every test even with valid local
+// credentials (see tests/integration/local-supabase-guard.test.ts). CI additionally
+// asserts a minimum executed-test count (see ci.yml) so this guard being wrong
+// again cannot produce a false-green run.
+const LOCAL_SUPABASE_URL = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?(\/|$)/
+
+export const isLocalSupabaseUrl = (url: string | undefined): boolean => LOCAL_SUPABASE_URL.test(url ?? '')
+
 export const skipIfNotLocal =
-  !process.env.SUPABASE_SERVICE_ROLE_KEY ||
-  !(process.env.NEXT_PUBLIC_SUPABASE_URL ?? '').includes('localhost')
+  !process.env.SUPABASE_SERVICE_ROLE_KEY || !isLocalSupabaseUrl(process.env.NEXT_PUBLIC_SUPABASE_URL)
 
 // ─── Service-role client ──────────────────────────────────────────────────────
 // Separate from the handler's getServiceClient() singleton, but targets the
