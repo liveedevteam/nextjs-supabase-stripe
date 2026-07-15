@@ -96,7 +96,7 @@ create table orders (
   stripe_session_id text unique not null,
   amount integer not null,
   currency text not null,
-  status text not null,
+  status text not null check (status in ('pending', 'paid', 'failed')),
   created_at timestamptz default now()
 );
 

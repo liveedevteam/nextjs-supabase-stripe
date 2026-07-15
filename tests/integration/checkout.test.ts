@@ -144,4 +144,72 @@ describe.skipIf(skipIfNotLocal)('checkout.session.completed handler', () => {
     expect(data).toHaveLength(1)
     expect(data![0].stripe_customer_id).toBe(customerId)
   })
+
+  it('payment mode with a delayed payment method (payment_status: unpaid) → order inserted as pending, then transitions to paid on async_payment_succeeded', async () => {
+    const sessionId = `cs_delayed_${Date.now()}`
+    trackedSessionIds.push(sessionId)
+
+    const completedReq = buildWebhookRequest(
+      'checkout.session.completed',
+      stripeFixtures.checkoutSessionCompleted({ id: sessionId, mode: 'payment', userId, paymentStatus: 'unpaid' }),
+      { secret: WEBHOOK_SECRET },
+    )
+    trackedEventIds.push(JSON.parse(await completedReq.clone().text()).id)
+
+    const res1 = await handler(completedReq)
+    expect(res1.status).toBe(200)
+
+    const { data: pending } = await db()
+      .from('orders')
+      .select('status')
+      .eq('stripe_session_id', sessionId)
+      .single()
+    expect(pending?.status).toBe('pending')
+
+    const succeededReq = buildWebhookRequest(
+      'checkout.session.async_payment_succeeded',
+      stripeFixtures.checkoutSessionCompleted({ id: sessionId, mode: 'payment', userId }),
+      { secret: WEBHOOK_SECRET },
+    )
+    trackedEventIds.push(JSON.parse(await succeededReq.clone().text()).id)
+
+    const res2 = await handler(succeededReq)
+    expect(res2.status).toBe(200)
+
+    const { data: paid } = await db()
+      .from('orders')
+      .select('status')
+      .eq('stripe_session_id', sessionId)
+      .single()
+    expect(paid?.status).toBe('paid')
+  })
+
+  it('payment mode with a delayed payment method → transitions to failed on async_payment_failed', async () => {
+    const sessionId = `cs_delayed_fail_${Date.now()}`
+    trackedSessionIds.push(sessionId)
+
+    const completedReq = buildWebhookRequest(
+      'checkout.session.completed',
+      stripeFixtures.checkoutSessionCompleted({ id: sessionId, mode: 'payment', userId, paymentStatus: 'unpaid' }),
+      { secret: WEBHOOK_SECRET },
+    )
+    trackedEventIds.push(JSON.parse(await completedReq.clone().text()).id)
+    await handler(completedReq)
+
+    const failedReq = buildWebhookRequest(
+      'checkout.session.async_payment_failed',
+      stripeFixtures.checkoutSessionCompleted({ id: sessionId, mode: 'payment', userId }),
+      { secret: WEBHOOK_SECRET },
+    )
+    trackedEventIds.push(JSON.parse(await failedReq.clone().text()).id)
+    const res = await handler(failedReq)
+    expect(res.status).toBe(200)
+
+    const { data } = await db()
+      .from('orders')
+      .select('status')
+      .eq('stripe_session_id', sessionId)
+      .single()
+    expect(data?.status).toBe('failed')
+  })
 })

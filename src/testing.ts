@@ -70,6 +70,8 @@ export interface CheckoutSessionCompletedOpts {
   customerId?: string
   amountTotal?: number
   currency?: string
+  /** Default: 'paid'. Pass 'unpaid' to simulate a delayed payment method (bank debit, etc). */
+  paymentStatus?: 'paid' | 'unpaid' | 'no_payment_required'
 }
 
 export interface SubscriptionOpts {
@@ -111,6 +113,7 @@ export const stripeFixtures = {
       customer: opts.customerId ?? 'cus_fixture',
       amount_total: opts.amountTotal ?? 2000,
       currency: opts.currency ?? 'usd',
+      payment_status: opts.paymentStatus ?? 'paid',
       ...(hasUser ? { metadata: { user_id: opts.userId } } : { metadata: {} }),
     }
   },

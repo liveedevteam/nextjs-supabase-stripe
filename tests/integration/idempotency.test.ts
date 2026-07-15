@@ -1,17 +1,17 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { createWebhookHandler } from '../../src/webhooks/handler.js'
 import { buildWebhookRequest, stripeFixtures } from '../../src/testing.js'
+import type Stripe from 'stripe'
 import {
   db,
   skipIfNotLocal,
+  stripeStub,
   WEBHOOK_SECRET,
   seedUser,
   seedCustomer,
   cleanupUser,
   cleanupWebhookEvents,
 } from './setup.js'
-
-const handler = createWebhookHandler()
 
 describe.skipIf(skipIfNotLocal)('idempotency — webhook_events UNIQUE constraint', () => {
   let userId: string
@@ -32,10 +32,14 @@ describe.skipIf(skipIfNotLocal)('idempotency — webhook_events UNIQUE constrain
   it('same event ID processed twice → second returns 200 Already processed, subscriptions table unchanged', async () => {
     const subId = `sub_idem_${Date.now()}`
     const priceId = 'price_idem_test'
+    const stripe = stripeStub({
+      [subId]: stripeFixtures.subscription({ id: subId, customerId, priceId, status: 'active' }) as unknown as Stripe.Subscription,
+    })
+    const handler = createWebhookHandler({ stripe })
 
     const req = buildWebhookRequest(
       'customer.subscription.created',
-      stripeFixtures.subscription({ id: subId, customerId, priceId, status: 'active' }),
+      stripeFixtures.subscription({ id: subId, customerId }),
       { secret: WEBHOOK_SECRET },
     )
     // Clone before first handler call consumes the body
@@ -61,6 +65,9 @@ describe.skipIf(skipIfNotLocal)('idempotency — webhook_events UNIQUE constrain
     expect(res2.status).toBe(200)
     expect(await res2.text()).toBe('Already processed')
 
+    // The claim was rejected before handleEvent ran — Stripe was not fetched again
+    expect(stripe.subscriptions.retrieve).toHaveBeenCalledTimes(1)
+
     // Subscriptions table must be identical — onSubscriptionUpdated was NOT called again
     const { data: secondState } = await db()
       .from('subscriptions')
@@ -73,20 +80,30 @@ describe.skipIf(skipIfNotLocal)('idempotency — webhook_events UNIQUE constrain
   it('two events with different IDs but same subscription ID → both processed, last write wins', async () => {
     const subId = `sub_twoevt_${Date.now()}`
 
+    // The subscriptions record is read at call time, not snapshotted — mutating
+    // it between the two handler() calls simulates Stripe's live state
+    // changing between the two webhook deliveries (a real price upgrade).
+    const subs: Record<string, Stripe.Subscription> = {}
+    const stripe = stripeStub(subs)
+    const handler = createWebhookHandler({ stripe })
+
     const reqA = buildWebhookRequest(
       'customer.subscription.created',
-      stripeFixtures.subscription({ id: subId, customerId, priceId: 'price_v1', status: 'active' }),
+      stripeFixtures.subscription({ id: subId, customerId }),
       { secret: WEBHOOK_SECRET },
     )
     const reqB = buildWebhookRequest(
       'customer.subscription.updated',
-      stripeFixtures.subscription({ id: subId, customerId, priceId: 'price_v2', status: 'trialing' }),
+      stripeFixtures.subscription({ id: subId, customerId }),
       { secret: WEBHOOK_SECRET },
     )
     trackedEventIds.push(JSON.parse(await reqA.clone().text()).id)
     trackedEventIds.push(JSON.parse(await reqB.clone().text()).id)
 
+    subs[subId] = stripeFixtures.subscription({ id: subId, customerId, priceId: 'price_v1', status: 'active' }) as unknown as Stripe.Subscription
     await handler(reqA)
+
+    subs[subId] = stripeFixtures.subscription({ id: subId, customerId, priceId: 'price_v2', status: 'trialing' }) as unknown as Stripe.Subscription
     await handler(reqB)
 
     // Both events processed; upsert means the second one overwrites the first

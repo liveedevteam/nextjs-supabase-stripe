@@ -1,52 +1,20 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type Stripe from 'stripe'
 import type { Database } from '../../database.types.js'
+import { syncSubscriptionFromStripe } from './subscription-sync.js'
 
-const resolveUserId = async (
-  stripeCustomerId: string,
-  supabase: SupabaseClient<Database>
-): Promise<string> => {
-  const { data } = await supabase
-    .from('stripe_customers')
-    .select('user_id')
-    .eq('stripe_customer_id', stripeCustomerId)
-    .single()
-  if (!data) throw new Error(`No user found for customer: ${stripeCustomerId}`)
-  return data.user_id
-}
-
+// customer.subscription.created and .updated both just mean "go re-read the
+// current state of this subscription from Stripe" — see subscription-sync.ts.
 export const onSubscriptionUpdated = async (
   subscription: Stripe.Subscription,
-  supabase: SupabaseClient<Database>
-) => {
-  const userId = await resolveUserId(subscription.customer as string, supabase)
-  const item = subscription.items.data[0]
-  if (!item) throw new Error(`Subscription ${subscription.id} has no items`)
-  const price = item.price
+  supabase: SupabaseClient<Database>,
+  stripe: Stripe
+): Promise<void> => syncSubscriptionFromStripe(subscription.id, stripe, supabase)
 
-  const { error } = await supabase.from('subscriptions').upsert(
-    {
-      user_id: userId,
-      stripe_subscription_id: subscription.id,
-      stripe_price_id: price?.id ?? '',
-      status: subscription.status,
-      current_period_start: new Date(item.current_period_start * 1000).toISOString(),
-      current_period_end: new Date(item.current_period_end * 1000).toISOString(),
-      cancel_at_period_end: subscription.cancel_at_period_end,
-      cancel_at: subscription.cancel_at ? new Date(subscription.cancel_at * 1000).toISOString() : null,
-    },
-    { onConflict: 'stripe_subscription_id' }
-  )
-  if (error) throw error
-}
-
+// Subscriptions are never hard-deleted in Stripe — cancellation just flips
+// status to 'canceled' — so the same fetch-and-upsert applies here too.
 export const onSubscriptionDeleted = async (
   subscription: Stripe.Subscription,
-  supabase: SupabaseClient<Database>
-) => {
-  const { error } = await supabase
-    .from('subscriptions')
-    .update({ status: 'canceled' })
-    .eq('stripe_subscription_id', subscription.id)
-  if (error) throw error
-}
+  supabase: SupabaseClient<Database>,
+  stripe: Stripe
+): Promise<void> => syncSubscriptionFromStripe(subscription.id, stripe, supabase)

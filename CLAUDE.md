@@ -135,10 +135,14 @@ export const POST = createWebhookHandler({ slack: { webhookUrl: process.env.SLAC
 
 | Table | Written by | Key columns |
 |---|---|---|
-| `orders` | `checkout.session.completed` (payment) | `user_id` (nullable), `stripe_session_id`, `amount`, `status` |
+| `orders` | `checkout.session.completed` (payment), `checkout.session.async_payment_succeeded/failed` | `user_id` (nullable), `stripe_session_id`, `amount`, `status` (`pending` \| `paid` \| `failed`) |
 | `stripe_customers` | `checkout.session.completed` (subscription) | `user_id`, `stripe_customer_id` |
-| `subscriptions` | `customer.subscription.created/updated/deleted` | `user_id`, `status`, `stripe_subscription_id` |
+| `subscriptions` | `customer.subscription.created/updated/deleted`, `invoice.paid`, `invoice.payment_failed` — all fetch the subscription fresh from Stripe and upsert the returned state, never the event payload | `user_id`, `status`, `stripe_subscription_id` |
 | `webhook_events` | Every processed event | `id`, `type` (idempotency) |
+
+`orders.status` starts `pending` when `payment_status !== 'paid'` at checkout (delayed payment methods like
+bank debits) and transitions to `paid`/`failed` on the matching async event. `subscriptions.status` always
+reflects Stripe's current live state — out-of-order webhook delivery can't regress it.
 
 ---
 
