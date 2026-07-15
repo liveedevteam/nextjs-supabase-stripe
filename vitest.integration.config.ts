@@ -9,7 +9,11 @@ import { defineConfig } from 'vitest/config'
 export default defineConfig({
   test: {
     environment: 'node',
+    // local-supabase-guard.test.ts is pure logic and runs in the fast unit
+    // suite (vitest.config.ts) instead — excluded here to keep this suite's
+    // count exactly the set of tests that require a live local Supabase stack.
     include: ['tests/integration/**/*.test.ts'],
+    exclude: ['**/node_modules/**', 'tests/integration/local-supabase-guard.test.ts'],
     testTimeout: 30_000,
     hookTimeout: 30_000,
     env: {

@@ -12,3 +12,5 @@ dist/
 supabase/.temp/
 demo/.next/
 demo/node_modules/
+integration-results.json
+supabase/.branches/
