@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.2.0] - 2026-07-15
+
+### Changed
+- Renamed package from `@liveedevteam/stripe` to `nextjs-supabase-stripe`. The old scoped package is deprecated on npm; install the new name going forward.
+
 ## [0.1.8] - 2026-06-19
 
 ### Added

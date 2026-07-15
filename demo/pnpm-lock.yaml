@@ -18,8 +18,8 @@ importers:
         specifier: ^16.2.9
         version: 16.2.9(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
       nextjs-supabase-stripe:
-        specifier: ^0.1.11
-        version: 0.1.11(@supabase/ssr@0.12.0(@supabase/supabase-js@2.109.0))(@supabase/supabase-js@2.109.0)(next@16.2.9(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(stripe@22.3.0(@types/node@20.19.43))
+        specifier: ^0.2.0
+        version: 0.2.0(@supabase/ssr@0.12.0(@supabase/supabase-js@2.109.0))(@supabase/supabase-js@2.109.0)(next@16.2.9(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(stripe@22.3.0(@types/node@20.19.43))
       react:
         specifier: ^19.2.7
         version: 19.2.7
@@ -334,8 +334,8 @@ packages:
       sass:
         optional: true
 
-  nextjs-supabase-stripe@0.1.11:
-    resolution: {integrity: sha512-8Tj7Emci3ztY/2BHpo3zi/C98psktnt0BfWIMJTHhC4MHNgUtcvLyCOw+evUks65/L4Mcj2iEf5hRBLcb7Lnpw==}
+  nextjs-supabase-stripe@0.2.0:
+    resolution: {integrity: sha512-VyOWVXLMqQkbDY4aryzwN80QtHGr5odH65z9Mzo/T+csLHovBuCqYu7Xa5RoJTgcTGkt0d+oc16BCOvI1EIf9Q==}
     engines: {node: '>=18'}
     peerDependencies:
       '@supabase/ssr': '>=0.5'
@@ -632,7 +632,7 @@ snapshots:
       - '@babel/core'
       - babel-plugin-macros
 
-  nextjs-supabase-stripe@0.1.11(@supabase/ssr@0.12.0(@supabase/supabase-js@2.109.0))(@supabase/supabase-js@2.109.0)(next@16.2.9(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(stripe@22.3.0(@types/node@20.19.43)):
+  nextjs-supabase-stripe@0.2.0(@supabase/ssr@0.12.0(@supabase/supabase-js@2.109.0))(@supabase/supabase-js@2.109.0)(next@16.2.9(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(stripe@22.3.0(@types/node@20.19.43)):
     dependencies:
       '@supabase/ssr': 0.12.0(@supabase/supabase-js@2.109.0)
       '@supabase/supabase-js': 2.109.0
