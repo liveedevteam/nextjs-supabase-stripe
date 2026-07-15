@@ -1,8 +1,8 @@
-# @liveedevteam/stripe
+# nextjs-supabase-stripe
 
 Stripe integration module for **Next.js App Router + Supabase** — one-time payments, subscriptions, webhooks, and server actions.
 
-[![npm version](https://img.shields.io/npm/v/@liveedevteam/stripe)](https://www.npmjs.com/package/@liveedevteam/stripe)
+[![npm version](https://img.shields.io/npm/v/nextjs-supabase-stripe)](https://www.npmjs.com/package/nextjs-supabase-stripe)
 [![CI](https://github.com/liveedevteam/nextjs-supabase-stripe/actions/workflows/ci.yml/badge.svg)](https://github.com/liveedevteam/nextjs-supabase-stripe/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
@@ -15,7 +15,7 @@ Add Stripe payments to your Next.js + Supabase app in under 5 minutes.
 ### 1. Install
 
 ```bash
-pnpm add @liveedevteam/stripe stripe @supabase/ssr
+pnpm add nextjs-supabase-stripe stripe @supabase/ssr
 ```
 
 ### 2. Add env vars
@@ -98,7 +98,7 @@ create policy "users_read_own_orders" on orders
 
 ```ts
 // app/api/webhooks/stripe/route.ts
-import { createWebhookHandler } from '@liveedevteam/stripe/webhooks'
+import { createWebhookHandler } from 'nextjs-supabase-stripe/webhooks'
 
 export const POST = createWebhookHandler()
 ```
@@ -110,7 +110,7 @@ Create a local `app/actions.ts` wrapper first (catches `Unauthorized` → redire
 ```ts
 // app/actions.ts
 'use server'
-import { createCheckout as _createCheckout } from '@liveedevteam/stripe/actions'
+import { createCheckout as _createCheckout } from 'nextjs-supabase-stripe/actions'
 import { redirect } from 'next/navigation'
 
 export async function createCheckout(priceId: string, mode: 'payment' | 'subscription') {
@@ -183,7 +183,7 @@ The button is a **server component** using `.bind()` — this is required. Wrapp
 ```tsx
 // app/actions.ts — local wrapper (catches Unauthorized → redirect to /login)
 'use server'
-import { createCheckout as _createCheckout } from '@liveedevteam/stripe/actions'
+import { createCheckout as _createCheckout } from 'nextjs-supabase-stripe/actions'
 import { redirect } from 'next/navigation'
 
 export async function createCheckout(priceId: string, mode: 'payment' | 'subscription') {
@@ -226,7 +226,7 @@ A single server action wires up the "Manage billing" button. Stripe handles the 
 
 ```tsx
 // demo/app/dashboard/portal-button.tsx
-import { getBillingPortal } from '@liveedevteam/stripe/actions'
+import { getBillingPortal } from 'nextjs-supabase-stripe/actions'
 
 export default function PortalButton() {
   return (
@@ -242,7 +242,7 @@ export default function PortalButton() {
 The cancel button calls `cancelSubscription()` which sets `cancel_at_period_end: true` on the Stripe subscription. The DB is updated automatically when Stripe fires `customer.subscription.updated` — no extra code needed:
 
 ```ts
-import { cancelSubscription } from '@liveedevteam/stripe/actions'
+import { cancelSubscription } from 'nextjs-supabase-stripe/actions'
 await cancelSubscription() // soft cancel — access until period end
 ```
 
@@ -252,7 +252,7 @@ The webhook route is one line. Signature verification, idempotency, and all even
 
 ```ts
 // demo/app/api/webhooks/stripe/route.ts
-import { createWebhookHandler } from '@liveedevteam/stripe/webhooks'
+import { createWebhookHandler } from 'nextjs-supabase-stripe/webhooks'
 export const POST = createWebhookHandler()
 ```
 
@@ -288,7 +288,7 @@ Claude detects what's already in place and walks through every step automaticall
 6. Optionally configures Slack failure notifications
 7. Warns you to run the backfill script if existing users are present
 
-The skill file (`SKILL.md`) ships inside the package — Claude Code reads it automatically from `node_modules/@liveedevteam/stripe/SKILL.md`. You get updated instructions with every version you install.
+The skill file (`SKILL.md`) ships inside the package — Claude Code reads it automatically from `node_modules/nextjs-supabase-stripe/SKILL.md`. You get updated instructions with every version you install.
 
 ### Example session
 
@@ -296,7 +296,7 @@ The skill file (`SKILL.md`) ships inside the package — Claude Code reads it au
 You: set up stripe
 
 Claude: Running preflight checks...
-  ✓ @liveedevteam/stripe installed
+  ✓ nextjs-supabase-stripe installed
   ✓ stripe installed
   ✓ @supabase/ssr installed
   ✗ Supabase migration not found
@@ -328,14 +328,14 @@ Claude: Running preflight checks...
 ## Installation
 
 ```bash
-pnpm add @liveedevteam/stripe stripe @supabase/ssr
+pnpm add nextjs-supabase-stripe stripe @supabase/ssr
 ```
 
 ## Webhook route
 
 ```ts
 // app/api/webhooks/stripe/route.ts
-import { createWebhookHandler } from '@liveedevteam/stripe/webhooks'
+import { createWebhookHandler } from 'nextjs-supabase-stripe/webhooks'
 
 export const POST = createWebhookHandler()
 ```
@@ -375,7 +375,7 @@ export const CheckoutButton = ({ priceId, mode }: {
 
 ```tsx
 // components/billing-portal-button.tsx  ← no 'use client'
-import { getBillingPortal } from '@liveedevteam/stripe/actions'
+import { getBillingPortal } from 'nextjs-supabase-stripe/actions'
 
 export const BillingPortalButton = () => (
   <form action={getBillingPortal}>
@@ -387,7 +387,7 @@ export const BillingPortalButton = () => (
 ### Guard a page
 
 ```ts
-import { requireActiveSubscription } from '@liveedevteam/stripe/actions'
+import { requireActiveSubscription } from 'nextjs-supabase-stripe/actions'
 
 export default async function DashboardPage() {
   await requireActiveSubscription() // redirects to /pricing if not active
@@ -398,7 +398,7 @@ export default async function DashboardPage() {
 ### Check subscription status
 
 ```ts
-import { getSubscription } from '@liveedevteam/stripe/actions'
+import { getSubscription } from 'nextjs-supabase-stripe/actions'
 
 const subscription = await getSubscription() // null for anonymous or no subscription
 if (subscription?.status === 'active' || subscription?.status === 'trialing') {
@@ -409,7 +409,7 @@ if (subscription?.status === 'active' || subscription?.status === 'trialing') {
 ### Cancel a subscription
 
 ```ts
-import { cancelSubscription } from '@liveedevteam/stripe/actions'
+import { cancelSubscription } from 'nextjs-supabase-stripe/actions'
 
 // Cancel at period end (default) — user keeps access until billing period ends
 await cancelSubscription()
@@ -423,7 +423,7 @@ The DB is updated automatically via `customer.subscription.updated` / `customer.
 ### Upgrade or downgrade
 
 ```ts
-import { changeSubscription } from '@liveedevteam/stripe/actions'
+import { changeSubscription } from 'nextjs-supabase-stripe/actions'
 
 await changeSubscription('price_new_plan_id')
 
@@ -437,7 +437,7 @@ The DB is updated automatically via `customer.subscription.updated` webhook.
 ## TypeScript types
 
 ```ts
-import type { Subscription, Database } from '@liveedevteam/stripe/types'
+import type { Subscription, Database } from 'nextjs-supabase-stripe/types'
 ```
 
 `Subscription` is derived directly from the `Database` schema so it stays in sync with your table.
@@ -457,7 +457,7 @@ import type { Subscription, Database } from '@liveedevteam/stripe/types'
 ## Testing
 
 ```ts
-import { buildWebhookRequest, stripeFixtures } from '@liveedevteam/stripe/testing'
+import { buildWebhookRequest, stripeFixtures } from 'nextjs-supabase-stripe/testing'
 ```
 
 Build a signed webhook request to pass directly to your route handler in tests:
@@ -479,7 +479,7 @@ Available fixtures: `checkoutSessionCompleted`, `subscription`, `invoice`. All a
 If users already had Stripe subscriptions before you installed this package, sync them into the `stripe_customers` table:
 
 ```bash
-node node_modules/@liveedevteam/stripe/dist/scripts/backfill.js
+node node_modules/nextjs-supabase-stripe/dist/scripts/backfill.js
 ```
 
 The script looks up each user by email in Stripe and records the match — it **does not create new Stripe customers**. Always run against staging first.

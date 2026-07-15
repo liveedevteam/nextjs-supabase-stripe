@@ -1,4 +1,4 @@
-# @liveedevteam/stripe — Roadmap
+# nextjs-supabase-stripe — Roadmap
 
 ---
 
@@ -19,7 +19,7 @@
 - [x] Handlers for `checkout.session.completed`, subscription lifecycle, invoice paid/failed, trial will end
 
 ### Type safety
-- [x] `Database` type exported from `@liveedevteam/stripe/types`
+- [x] `Database` type exported from `nextjs-supabase-stripe/types`
 - [x] `getServiceClient()` returns `SupabaseClient<Database>` — column names checked at compile time
 - [x] `Subscription` type derived from DB schema — always in sync
 - [x] Stripe v22 / dahlia API compatibility (period dates on item, invoice subscription ID via parent)
@@ -32,7 +32,7 @@
 
 ### Infrastructure
 - [x] Dual ESM + CJS build via tsup
-- [x] `@liveedevteam/stripe/actions`, `/webhooks`, `/types`, `/testing` entry points
+- [x] `nextjs-supabase-stripe/actions`, `/webhooks`, `/types`, `/testing` entry points
 - [x] CHANGELOG, CLAUDE.md AI context, SKILL.md automated setup skill
 - [x] Migration SQL with RLS policies, `cancel_at` column
 

@@ -1,4 +1,4 @@
--- Integration test schema for @liveedevteam/stripe
+-- Integration test schema for nextjs-supabase-stripe
 -- Apply with: supabase db reset (wipes + re-applies)
 --
 -- Intentional divergences from SKILL.md:

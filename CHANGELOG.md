@@ -19,7 +19,7 @@
 
 ### Added
 - `cancelSubscription(immediately?)` server action — soft cancel (default, sets `cancel_at_period_end: true`) or immediate cancel (`stripe.subscriptions.cancel`); DB updated via existing webhook handlers in both cases
-- `Database` type exported from `@liveedevteam/stripe/types` — covers `Row`, `Insert`, `Update` for all four package-owned tables; consumers can merge it with their own generated types
+- `Database` type exported from `nextjs-supabase-stripe/types` — covers `Row`, `Insert`, `Update` for all four package-owned tables; consumers can merge it with their own generated types
 
 ### Changed
 - `Subscription` type is now derived from `Database['public']['Tables']['subscriptions']['Row']` so it stays in sync with the schema automatically
@@ -35,7 +35,7 @@
 ## [0.1.5] - 2026-06-19
 
 ### Added
-- New `@liveedevteam/stripe/testing` export with two utilities:
+- New `nextjs-supabase-stripe/testing` export with two utilities:
   - `buildWebhookRequest(eventType, object, options)` — builds a properly HMAC-signed `Request` that passes Stripe's `constructEvent` verification; pass it directly to your `POST` route handler in tests
   - `stripeFixtures` — pre-built event objects in the 2026-05-27.dahlia API shape (period dates on `items.data[0]`, invoice subscription at `parent.subscription_details.subscription`)
 
@@ -55,7 +55,7 @@
 - Guard against undefined subscription item before reading `current_period_start/end` (dahlia API)
 - Invoice handlers updated for dahlia API: subscription ID now at `parent.subscription_details.subscription`
 - Subscription checkout with no `user_id` in metadata now throws instead of silently skipping
-- Fix `@company/stripe` → `@liveedevteam/stripe` throughout `SKILL.md`
+- Fix `@company/stripe` → `nextjs-supabase-stripe` throughout `SKILL.md`
 
 ### Changed
 - Supabase service client is now a lazy singleton (was created at module load / per webhook request)
@@ -67,7 +67,7 @@
 ### Added
 - `cancel_at` column in subscriptions schema and written on every subscription upsert
 - Row Level Security policies in migration for `stripe_customers`, `subscriptions`, and `orders`
-- Export `Subscription` type from `@liveedevteam/stripe/types`
+- Export `Subscription` type from `nextjs-supabase-stripe/types`
 - PR CI workflow: typecheck and build run on every push and pull request
 - `peerDependencies` tightened to `stripe >= 22` to match the API version in use
 

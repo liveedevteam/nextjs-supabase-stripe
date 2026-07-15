@@ -1,6 +1,6 @@
 'use server'
 
-import { createCheckout as _createCheckout } from '@liveedevteam/stripe/actions'
+import { createCheckout as _createCheckout } from 'nextjs-supabase-stripe/actions'
 import { redirect } from 'next/navigation'
 
 export async function createCheckout(priceId: string, mode: 'subscription' | 'payment') {

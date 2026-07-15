@@ -1,7 +1,7 @@
-# Skill: Setup Stripe — @liveedevteam/stripe
+# Skill: Setup Stripe — nextjs-supabase-stripe
 
 ## Description
-Fully sets up the `@liveedevteam/stripe` module in the current Next.js + Supabase project.
+Fully sets up the `nextjs-supabase-stripe` module in the current Next.js + Supabase project.
 Handles both new projects and existing projects that need Stripe added.
 
 Trigger phrases:
@@ -25,9 +25,9 @@ Before doing anything, Claude must verify the following. Stop and report clearly
    - Check for `NEXT_PUBLIC_SUPABASE_URL` in `.env.local` or `.env`
    - If not found → stop and tell the engineer to set up Supabase first
 
-3. **Is `@liveedevteam/stripe` already installed?**
-   - Check `package.json` for `@liveedevteam/stripe`
-   - If not found → run `pnpm add @liveedevteam/stripe stripe @supabase/ssr` before continuing
+3. **Is `nextjs-supabase-stripe` already installed?**
+   - Check `package.json` for `nextjs-supabase-stripe`
+   - If not found → run `pnpm add nextjs-supabase-stripe stripe @supabase/ssr` before continuing
 
 4. **Is Stripe already set up in this project?**
    - Check if `app/api/webhooks/stripe/route.ts` already exists
@@ -42,10 +42,10 @@ Before doing anything, Claude must verify the following. Stop and report clearly
 
 ## Step 1 — Install Dependencies
 
-If `stripe`, `@liveedevteam/stripe`, or `@supabase/ssr` are missing from `package.json`, install them:
+If `stripe`, `nextjs-supabase-stripe`, or `@supabase/ssr` are missing from `package.json`, install them:
 
 ```bash
-pnpm add @liveedevteam/stripe stripe @supabase/ssr
+pnpm add nextjs-supabase-stripe stripe @supabase/ssr
 ```
 
 Verify installation succeeded before moving to the next step.
@@ -138,7 +138,7 @@ If `supabase db push` fails, report the error clearly and stop. Do not continue 
 Create `app/api/webhooks/stripe/route.ts` if it does not already exist:
 
 ```ts
-import { createWebhookHandler } from '@liveedevteam/stripe/webhooks'
+import { createWebhookHandler } from 'nextjs-supabase-stripe/webhooks'
 
 export const POST = createWebhookHandler()
 ```
@@ -147,7 +147,7 @@ export const POST = createWebhookHandler()
 
 ## Step 4 — Server Actions Wrapper
 
-**Important:** Do NOT import server actions from `@liveedevteam/stripe/actions` directly inside
+**Important:** Do NOT import server actions from `nextjs-supabase-stripe/actions` directly inside
 `'use client'` components and wrap them in arrow functions — this breaks Next.js server action
 binding and the form will silently fail.
 
@@ -160,7 +160,7 @@ import {
   createCheckout as _createCheckout,
   getBillingPortal as _getBillingPortal,
   cancelSubscription as _cancelSubscription,
-} from '@liveedevteam/stripe/actions'
+} from 'nextjs-supabase-stripe/actions'
 import { redirect } from 'next/navigation'
 
 function rethrowRedirect(e: unknown): never {
@@ -333,7 +333,7 @@ Would you like to enable Slack notifications when a webhook event fails? (yes/no
 
 4. Update `app/api/webhooks/stripe/route.ts` to pass the Slack config:
    ```ts
-   import { createWebhookHandler } from '@liveedevteam/stripe/webhooks'
+   import { createWebhookHandler } from 'nextjs-supabase-stripe/webhooks'
 
    export const POST = createWebhookHandler({
      slack: {
@@ -367,7 +367,7 @@ If this is an **existing project** (had `supabase/migrations/` before this skill
 This project has existing auth users who do not have a Stripe customer ID.
 Before going live, run the backfill script:
 
-  node node_modules/@liveedevteam/stripe/dist/scripts/backfill.js
+  node node_modules/nextjs-supabase-stripe/dist/scripts/backfill.js
 
 Always run this against staging first. Never run directly on production without testing.
 ```
@@ -459,5 +459,5 @@ Next steps:
 | `Invalid character in header ["Authorization"]` | `STRIPE_SECRET_KEY` has a trailing newline from `echo \| vercel env add` | Re-add with `printf` |
 | Stripe rejects `success_url` with `url_invalid` | `NEXT_PUBLIC_APP_URL` has trailing `\n` or wrong value | Re-add with `printf`, verify no trailing slash or newline |
 | `Unauthorized` error on checkout click | User not logged in; package throws instead of redirecting | `app/actions.ts` wrapper catches this and redirects to `/login` |
-| `Module not found: @liveedevteam/stripe` on Vercel | Demo uses `"file:.."` local path; Vercel only uploads the subdirectory | Change to published npm version `"^x.x.x"` in `package.json` |
+| `Module not found: nextjs-supabase-stripe` on Vercel | Demo uses `"file:.."` local path; Vercel only uploads the subdirectory | Change to published npm version `"^x.x.x"` in `package.json` |
 | `NEXT_REDIRECT` swallowed / no navigation | `try/catch` catches Next.js redirect error without re-throwing | Always check `e.digest?.startsWith('NEXT_REDIRECT')` and re-throw |

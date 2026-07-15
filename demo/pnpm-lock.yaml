@@ -8,9 +8,6 @@ importers:
 
   .:
     dependencies:
-      '@liveedevteam/stripe':
-        specifier: ^0.1.11
-        version: 0.1.11(@supabase/ssr@0.12.0(@supabase/supabase-js@2.109.0))(@supabase/supabase-js@2.109.0)(next@16.2.9(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(stripe@22.3.0(@types/node@20.19.43))
       '@supabase/ssr':
         specifier: ^0.12.0
         version: 0.12.0(@supabase/supabase-js@2.109.0)
@@ -20,6 +17,9 @@ importers:
       next:
         specifier: ^16.2.9
         version: 16.2.9(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
+      nextjs-supabase-stripe:
+        specifier: ^0.1.11
+        version: 0.1.11(@supabase/ssr@0.12.0(@supabase/supabase-js@2.109.0))(@supabase/supabase-js@2.109.0)(next@16.2.9(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(stripe@22.3.0(@types/node@20.19.43))
       react:
         specifier: ^19.2.7
         version: 19.2.7
@@ -185,15 +185,6 @@ packages:
     cpu: [x64]
     os: [win32]
 
-  '@liveedevteam/stripe@0.1.11':
-    resolution: {integrity: sha512-WiDW+5OxF65s3t1PSXCVR+1EDwQv2FMjUEfCMwFfPeznmhO9Lw8FS9f8pOSXADi4sLPORI1XZFcIabvMAI23Jg==}
-    engines: {node: '>=18'}
-    peerDependencies:
-      '@supabase/ssr': '>=0.5'
-      '@supabase/supabase-js': '>=2'
-      next: '>=14'
-      stripe: '>=22'
-
   '@next/env@16.2.9':
     resolution: {integrity: sha512-ki5VxxXfzD/9TDe13wyeTKIjQTAwBVpnr8KhRDUr8ltMUq1/NBpWNT5tiPoxiGl+PHM4X2ahSOiPk6iAimIzPg==}
 
@@ -342,6 +333,15 @@ packages:
         optional: true
       sass:
         optional: true
+
+  nextjs-supabase-stripe@0.1.11:
+    resolution: {integrity: sha512-8Tj7Emci3ztY/2BHpo3zi/C98psktnt0BfWIMJTHhC4MHNgUtcvLyCOw+evUks65/L4Mcj2iEf5hRBLcb7Lnpw==}
+    engines: {node: '>=18'}
+    peerDependencies:
+      '@supabase/ssr': '>=0.5'
+      '@supabase/supabase-js': '>=2'
+      next: '>=14'
+      stripe: '>=22'
 
   picocolors@1.1.1:
     resolution: {integrity: sha512-xceH2snhtb5M9liqDsmEw56le376mTZkEX/jEb/RxNFyegNul7eNslCXP9FDj/Lcu0X8KEyMceP2ntpaHrDEVA==}
@@ -512,13 +512,6 @@ snapshots:
   '@img/sharp-win32-x64@0.34.5':
     optional: true
 
-  '@liveedevteam/stripe@0.1.11(@supabase/ssr@0.12.0(@supabase/supabase-js@2.109.0))(@supabase/supabase-js@2.109.0)(next@16.2.9(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(stripe@22.3.0(@types/node@20.19.43))':
-    dependencies:
-      '@supabase/ssr': 0.12.0(@supabase/supabase-js@2.109.0)
-      '@supabase/supabase-js': 2.109.0
-      next: 16.2.9(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
-      stripe: 22.3.0(@types/node@20.19.43)
-
   '@next/env@16.2.9': {}
 
   '@next/swc-darwin-arm64@16.2.9':
@@ -638,6 +631,13 @@ snapshots:
     transitivePeerDependencies:
       - '@babel/core'
       - babel-plugin-macros
+
+  nextjs-supabase-stripe@0.1.11(@supabase/ssr@0.12.0(@supabase/supabase-js@2.109.0))(@supabase/supabase-js@2.109.0)(next@16.2.9(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(stripe@22.3.0(@types/node@20.19.43)):
+    dependencies:
+      '@supabase/ssr': 0.12.0(@supabase/supabase-js@2.109.0)
+      '@supabase/supabase-js': 2.109.0
+      next: 16.2.9(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
+      stripe: 22.3.0(@types/node@20.19.43)
 
   picocolors@1.1.1: {}
 

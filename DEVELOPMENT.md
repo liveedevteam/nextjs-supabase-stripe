@@ -15,7 +15,7 @@ See `SKILL.md` for full details on what the skill does.
 
 ## Project Overview
 
-This is the `@liveedevteam/stripe` internal npm package — a reusable Stripe integration module for all company projects running the following tech stack:
+This is the `nextjs-supabase-stripe` internal npm package — a reusable Stripe integration module for all company projects running the following tech stack:
 
 - **Next.js** (App Router)
 - **Next.js Server Actions**
@@ -28,7 +28,7 @@ The module handles both **one-time payments** and **subscriptions** via Stripe C
 ## Package Structure
 
 ```
-@liveedevteam/stripe/
+nextjs-supabase-stripe/
 ├── src/
 │   ├── client.ts               # Stripe singleton
 │   ├── actions/
@@ -334,7 +334,7 @@ Mount in your project:
 
 ```ts
 // app/api/webhooks/stripe/route.ts
-import { createWebhookHandler } from '@liveedevteam/stripe/webhooks'
+import { createWebhookHandler } from 'nextjs-supabase-stripe/webhooks'
 
 // Without Slack (default)
 export const POST = createWebhookHandler()
@@ -391,7 +391,7 @@ Run once for existing projects that go live after Stripe is integrated. Syncs ex
 customers into the `stripe_customers` table — does **not** create new Stripe customers.
 
 ```bash
-node node_modules/@liveedevteam/stripe/dist/scripts/backfill.js
+node node_modules/nextjs-supabase-stripe/dist/scripts/backfill.js
 ```
 
 - Paginates through all auth users (1000 per page)
@@ -409,7 +409,7 @@ node node_modules/@liveedevteam/stripe/dist/scripts/backfill.js
 ```tsx
 // components/CheckoutButton.tsx
 'use client'
-import { createCheckout } from '@liveedevteam/stripe/actions'
+import { createCheckout } from 'nextjs-supabase-stripe/actions'
 
 export const CheckoutButton = ({ priceId, mode }: {
   priceId: string
@@ -425,7 +425,7 @@ export const CheckoutButton = ({ priceId, mode }: {
 
 ```tsx
 'use client'
-import { getBillingPortal } from '@liveedevteam/stripe/actions'
+import { getBillingPortal } from 'nextjs-supabase-stripe/actions'
 
 export const BillingPortalButton = () => (
   <form action={getBillingPortal}>
@@ -438,7 +438,7 @@ export const BillingPortalButton = () => (
 
 ```ts
 // app/dashboard/page.tsx
-import { requireActiveSubscription } from '@liveedevteam/stripe/actions'
+import { requireActiveSubscription } from 'nextjs-supabase-stripe/actions'
 
 export default async function DashboardPage() {
   await requireActiveSubscription() // redirects to /pricing if not active
@@ -467,12 +467,12 @@ SLACK_WEBHOOK_URL=https://hooks.slack.com/services/xxx/xxx/xxx
 
 ## Implementation Checklist — New Project
 
-- [ ] `pnpm add @liveedevteam/stripe stripe @supabase/ssr`
+- [ ] `pnpm add nextjs-supabase-stripe stripe @supabase/ssr`
 - [ ] Add env vars
 - [ ] `supabase init` (if not already)
 - [ ] `supabase migration new create_stripe_tables` — paste SQL, then `supabase db push`
 - [ ] Create `app/api/webhooks/stripe/route.ts`
-- [ ] Use Server Actions from `@liveedevteam/stripe/actions` in components
+- [ ] Use Server Actions from `nextjs-supabase-stripe/actions` in components
 - [ ] Test: `stripe listen --forward-to localhost:3000/api/webhooks/stripe`
 - [ ] (Optional) Add `SLACK_WEBHOOK_URL` env var and pass `slack` config to `createWebhookHandler`
 

@@ -1,17 +1,17 @@
-# @liveedevteam/stripe — AI context for Claude Code
+# nextjs-supabase-stripe — AI context for Claude Code
 
 This file is loaded automatically by Claude Code when this package is installed.
-It helps Claude give accurate assistance when you work with `@liveedevteam/stripe`.
+It helps Claude give accurate assistance when you work with `nextjs-supabase-stripe`.
 
 ---
 
 ## What this package exports
 
 ```ts
-import { createCheckout, getBillingPortal, getSubscription, requireActiveSubscription, changeSubscription, cancelSubscription } from '@liveedevteam/stripe/actions'
-import { createWebhookHandler } from '@liveedevteam/stripe/webhooks'
-import { buildWebhookRequest, stripeFixtures } from '@liveedevteam/stripe/testing'
-import type { Subscription, Database } from '@liveedevteam/stripe/types'
+import { createCheckout, getBillingPortal, getSubscription, requireActiveSubscription, changeSubscription, cancelSubscription } from 'nextjs-supabase-stripe/actions'
+import { createWebhookHandler } from 'nextjs-supabase-stripe/webhooks'
+import { buildWebhookRequest, stripeFixtures } from 'nextjs-supabase-stripe/testing'
+import type { Subscription, Database } from 'nextjs-supabase-stripe/types'
 ```
 
 ---
@@ -170,7 +170,7 @@ SLACK_WEBHOOK_URL   # optional
 ## Testing helpers
 
 ```ts
-import { buildWebhookRequest, stripeFixtures } from '@liveedevteam/stripe/testing'
+import { buildWebhookRequest, stripeFixtures } from 'nextjs-supabase-stripe/testing'
 ```
 
 - `buildWebhookRequest(eventType, object, options?)` — builds a signed `Request` with correct `stripe-signature` header. Pass directly to your route handler in tests.
@@ -195,7 +195,7 @@ expect(res.status).toBe(200)
 ## Backfill script
 
 ```bash
-node node_modules/@liveedevteam/stripe/dist/scripts/backfill.js
+node node_modules/nextjs-supabase-stripe/dist/scripts/backfill.js
 ```
 
 - Syncs existing Stripe customers into the `stripe_customers` table by looking them up in Stripe by email. **Does not create new customers** — only records users who already exist in Stripe.
@@ -214,4 +214,4 @@ To use it, say:
 set up stripe
 ```
 
-The skill file is at `node_modules/@liveedevteam/stripe/SKILL.md`.
+The skill file is at `node_modules/nextjs-supabase-stripe/SKILL.md`.

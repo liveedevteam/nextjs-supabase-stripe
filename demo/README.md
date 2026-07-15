@@ -1,4 +1,4 @@
-# @liveedevteam/stripe — Demo App
+# nextjs-supabase-stripe — Demo App
 
 A minimal Next.js + Supabase app demonstrating the full billing flow.
 

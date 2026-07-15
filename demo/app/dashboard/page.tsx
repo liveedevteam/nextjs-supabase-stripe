@@ -1,4 +1,4 @@
-import { requireActiveSubscription, getSubscription } from '@liveedevteam/stripe/actions'
+import { requireActiveSubscription, getSubscription } from 'nextjs-supabase-stripe/actions'
 import Nav from '../nav'
 import PortalButton from './portal-button'
 import CancelButton from './cancel-button'

@@ -6,7 +6,7 @@ export default function Home() {
       <Nav />
       <div className="container">
         <div className="hero">
-          <div className="code-badge">pnpm add @liveedevteam/stripe</div>
+          <div className="code-badge">pnpm add nextjs-supabase-stripe</div>
           <h1>Stripe billing for<br /><span>Next.js + Supabase</span></h1>
           <p>
             One-time payments, subscriptions, webhooks, and server actions —

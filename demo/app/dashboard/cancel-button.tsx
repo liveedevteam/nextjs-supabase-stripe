@@ -1,6 +1,6 @@
 'use client'
 
-import { cancelSubscription } from '@liveedevteam/stripe/actions'
+import { cancelSubscription } from 'nextjs-supabase-stripe/actions'
 import { useTransition } from 'react'
 
 export default function CancelButton() {

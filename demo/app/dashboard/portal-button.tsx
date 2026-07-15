@@ -1,6 +1,6 @@
 'use client'
 
-import { getBillingPortal } from '@liveedevteam/stripe/actions'
+import { getBillingPortal } from 'nextjs-supabase-stripe/actions'
 
 export default function PortalButton() {
   return (

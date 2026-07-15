@@ -16,7 +16,7 @@ type SubscriptionStatus =
  * merge this with your own generated types:
  *
  * @example
- * import type { Database as BillingDB } from '@liveedevteam/stripe/types'
+ * import type { Database as BillingDB } from 'nextjs-supabase-stripe/types'
  * type Database = BillingDB & { public: { Tables: { ...yourTables } } }
  */
 export type Database = {
