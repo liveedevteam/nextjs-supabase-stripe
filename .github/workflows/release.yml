@@ -58,7 +58,9 @@ jobs:
       - run: pnpm build
 
       - name: Pack tarball
-        run: npm pack --pack-destination /tmp/pack
+        run: |
+          mkdir -p /tmp/pack
+          npm pack --pack-destination /tmp/pack
 
       - name: Extract tarball
         run: |
