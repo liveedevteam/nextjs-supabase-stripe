@@ -1,5 +1,56 @@
 # Changelog
 
+## [0.3.0] - 2026-07-16
+
+Release-blocking correctness and release-confidence work — see `ROADMAP.md`'s P0 section. All six
+items below shipped as independently reviewed PRs (#2–#7) before this release was tagged.
+
+### Fixed
+- **Webhook delivery order could regress subscription state.** `invoice.paid` hardcoded `status: 'active'`
+  on every event, so a delayed or retried `invoice.paid` arriving after Stripe had already canceled the
+  subscription would silently reactivate it. Subscription lifecycle events (`customer.subscription.*`,
+  `invoice.paid`, `invoice.payment_failed`) now retrieve the subscription fresh from Stripe and upsert
+  that, instead of trusting each event's own payload — this also makes out-of-order delivery harmless by
+  construction.
+- **One-time payments were recorded as paid before payment cleared.** `checkout.session.completed` wrote
+  `status: 'paid'` regardless of `payment_status`. Orders now start `pending` when the payment method is
+  delayed (e.g. a bank debit) and transition to `paid`/`failed` via two new handled events
+  (`checkout.session.async_payment_succeeded` / `.async_payment_failed`), enforced by a DB `CHECK`
+  constraint on `orders.status`.
+- **The backfill script errored on every user.** It queried a `stripe_customers.id` column that doesn't
+  exist (`user_id` is the primary key) and discarded the error, silently treating every user as unsynced
+  on every run. Also fixed: a user with no email could match an arbitrary Stripe customer (the email
+  filter was silently omitted); an email matching multiple Stripe customers picked one arbitrarily instead
+  of being flagged for review; one user's failure aborted the entire run. Added `--dry-run` and a summary
+  report (matched / already synced / no email / no Stripe customer / ambiguous / failed).
+- **Database outages were reported as "no subscription" / "no customer".** `getBillingPortal`,
+  `getSubscription`, `cancelSubscription`, and `changeSubscription` discarded the Supabase query `error`
+  and only checked whether `data` was null. Every read now distinguishes a real database failure
+  (`DatabaseError`) from a genuine "not found".
+- **Missing `STRIPE_WEBHOOK_SECRET` returned a misleading `400 Invalid signature`.** The webhook handler
+  now validates it per-request and returns `500` naming the missing variable.
+- **Integration tests silently skipped in CI.** The local-Supabase guard matched a literal `"localhost"`
+  substring, but `supabase status --output env` returns `127.0.0.1` — so the entire integration suite
+  reported 15 skipped instead of 15 passed, with credentials fully valid. CI now asserts a minimum
+  executed-test count so this class of false-green can't happen silently again.
+- **The release workflow published to npm with no gate.** No typecheck, no tests, not even a build-success
+  check, using a long-lived `NPM_TOKEN`. Releases are now tag-triggered, run the full test suite plus a
+  packed-tarball content assertion, an ESM/CJS import smoke test, and a demo build against the tarball
+  before publishing via npm trusted publishing (OIDC) — no token secret.
+
+### Changed
+- `supabase/migrations/` is now shipped inside the npm package and is the single source of truth for the
+  schema — `SKILL.md`, `README.md`, and `DEVELOPMENT.md` no longer carry a separately drifting copy, and
+  `src/database.types.ts` is generated from it with CI failing the build on any divergence.
+- Exported typed errors (`UnauthorizedError`, `CustomerNotFoundError`, `NoActiveSubscriptionError`,
+  `DatabaseError`, `InvalidRedirectUrlError`, `MissingEnvironmentVariableError`) from `/actions` and
+  `/webhooks`, replacing `error.message === 'Unauthorized'`-style matching throughout the package and its
+  docs.
+- `getStripeClient()`/`getServiceClient()` validate required environment variables lazily, at first use,
+  listing every missing variable in one error instead of failing opaquely on whichever one is read first.
+- `createCheckout`/`getBillingPortal` validate `NEXT_PUBLIC_APP_URL` as a parseable absolute URL before
+  building Stripe redirect URLs.
+
 ## [0.2.0] - 2026-07-15
 
 ### Changed
