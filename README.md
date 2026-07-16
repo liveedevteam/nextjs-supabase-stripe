@@ -479,10 +479,38 @@ Available fixtures: `checkoutSessionCompleted`, `subscription`, `invoice`. All a
 If users already had Stripe subscriptions before you installed this package, sync them into the `stripe_customers` table:
 
 ```bash
+# Preview first — makes no writes, only reports what it would do
+node node_modules/nextjs-supabase-stripe/dist/scripts/backfill.js --dry-run
+
+# Then run for real
 node node_modules/nextjs-supabase-stripe/dist/scripts/backfill.js
 ```
 
-The script looks up each user by email in Stripe and records the match — it **does not create new Stripe customers**. Always run against staging first.
+The script looks up each user by email in Stripe and records the match — it **does not create new
+Stripe customers**. Always run against staging first.
+
+It prints a summary and exits non-zero if anything failed:
+
+```
+Backfill complete.
+  Total users checked:     412
+  Matched:                 38
+  Already synced:          9
+  No email:                2
+  No Stripe customer:      360
+  Ambiguous:                2
+  Failed:                  1
+
+Ambiguous — multiple Stripe customers share this email, review manually:
+  user 8f2a... (shared@example.com): cus_abc, cus_def
+
+Failed:
+  user 3c91...: stripe_customers insert failed: ...
+```
+
+`Ambiguous` means more than one Stripe customer shares that user's email — the script never guesses
+which one to link; review those manually in the Stripe dashboard. `Failed` covers real errors (a
+database or Stripe API failure), never a user who simply has no matching Stripe customer.
 
 ## License
 

@@ -333,13 +333,20 @@ Run once for existing projects that go live after Stripe is integrated. Syncs ex
 customers into the `stripe_customers` table — does **not** create new Stripe customers.
 
 ```bash
-node node_modules/nextjs-supabase-stripe/dist/scripts/backfill.js
+node node_modules/nextjs-supabase-stripe/dist/scripts/backfill.js --dry-run   # preview, no writes
+node node_modules/nextjs-supabase-stripe/dist/scripts/backfill.js            # run for real
 ```
 
 - Paginates through all auth users (1000 per page)
-- Skips users who already have a `stripe_customer_id`
+- Skips users who already have a `stripe_customers` row
 - Looks up Stripe customer by email — users who changed email after paying may be missed
 - Retries on Stripe 429 rate-limit errors with exponential backoff
+- Never guesses on an ambiguous match — if a user's email matches more than one Stripe customer, it's
+  reported for manual review instead of picking one
+- Real failures (a database or Stripe API error) are tracked separately from "no matching Stripe
+  customer" and reported in the summary; the process exits non-zero if any occurred
+- `backfillStripeCustomers()` accepts `{ supabase, stripe, dryRun, throttleMs }` for testing — see
+  `src/__tests__/backfill.test.ts`
 - Always test against staging first
 
 ---

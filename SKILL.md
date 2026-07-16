@@ -374,7 +374,11 @@ If this is an **existing project** (had `supabase/migrations/` before this skill
 ⚠️  Backfill required for existing users
 
 This project has existing auth users who do not have a Stripe customer ID.
-Before going live, run the backfill script:
+Before going live, preview the backfill first (makes no writes):
+
+  node node_modules/nextjs-supabase-stripe/dist/scripts/backfill.js --dry-run
+
+Review the summary — especially any "Ambiguous" or "Failed" entries — then run for real:
 
   node node_modules/nextjs-supabase-stripe/dist/scripts/backfill.js
 
