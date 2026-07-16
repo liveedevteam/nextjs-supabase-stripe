@@ -211,11 +211,14 @@ expect(res.status).toBe(200)
 ## Backfill script
 
 ```bash
-node node_modules/nextjs-supabase-stripe/dist/scripts/backfill.js
+node node_modules/nextjs-supabase-stripe/dist/scripts/backfill.js --dry-run   # preview, no writes
+node node_modules/nextjs-supabase-stripe/dist/scripts/backfill.js            # run for real
 ```
 
 - Syncs existing Stripe customers into the `stripe_customers` table by looking them up in Stripe by email. **Does not create new customers** — only records users who already exist in Stripe.
 - Run against staging first. Throttled to one user per 200 ms to avoid Stripe rate limits.
+- Never guesses on an ambiguous match (multiple Stripe customers sharing one email) — reports it for manual review instead.
+- Prints a summary (matched, already synced, no email, no Stripe customer, ambiguous, failed) and exits non-zero if any user failed for a real reason (DB or Stripe error) — a user with no matching Stripe customer is not a failure.
 
 ---
 
