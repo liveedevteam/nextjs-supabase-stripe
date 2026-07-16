@@ -26,6 +26,11 @@ jobs:
   release:
     needs: integration
     runs-on: ubuntu-latest
+    # Must match the "GitHub Actions Environment" configured on npmjs.com's
+    # Trusted Publisher form for this package — the OIDC token's claims are
+    # checked against it, and a mismatch causes a confusing 404 on publish
+    # rather than a clear auth error.
+    environment: release
     steps:
       - uses: actions/checkout@v4
 
